@@ -7,7 +7,8 @@ const globalState = globalThis.__gruVoucherMemory || {
   hotels: [],
   vouchers: [],
   sessions: [],
-  batches: []
+  batches: [],
+  db_setup_issue: ""
 };
 
 globalThis.__gruVoucherMemory = globalState;
@@ -84,96 +85,109 @@ async function ensureD1(env) {
     return true;
   }
 
-  await env.DB.exec(`
-    CREATE TABLE IF NOT EXISTS staff (
-      staff_number TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      status TEXT NOT NULL,
-      role TEXT NOT NULL
-    );
+  try {
+    await env.DB.exec(`
+      CREATE TABLE IF NOT EXISTS staff (
+        staff_number TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        role TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS vendors (
-      vendor_code TEXT PRIMARY KEY,
-      vendor_name TEXT NOT NULL,
-      billing_type TEXT NOT NULL,
-      value_amount REAL,
-      combo_text TEXT,
-      locations_text TEXT,
-      pin TEXT NOT NULL,
-      status TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS vendors (
+        vendor_code TEXT PRIMARY KEY,
+        vendor_name TEXT NOT NULL,
+        billing_type TEXT NOT NULL,
+        value_amount REAL,
+        combo_text TEXT,
+        locations_text TEXT,
+        pin TEXT NOT NULL,
+        status TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS hotels (
-      hotel_code TEXT PRIMARY KEY,
-      hotel_name TEXT NOT NULL,
-      address TEXT NOT NULL,
-      phone TEXT NOT NULL,
-      shuttle_info TEXT NOT NULL,
-      pin TEXT NOT NULL,
-      status TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS hotels (
+        hotel_code TEXT PRIMARY KEY,
+        hotel_name TEXT NOT NULL,
+        address TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        shuttle_info TEXT NOT NULL,
+        pin TEXT NOT NULL,
+        status TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS sessions (
-      token TEXT PRIMARY KEY,
-      actor_type TEXT NOT NULL,
-      actor_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY,
+        actor_type TEXT NOT NULL,
+        actor_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS vouchers (
-      id TEXT PRIMARY KEY,
-      voucher_type TEXT NOT NULL,
-      subtype TEXT,
-      status TEXT NOT NULL,
-      vendor_code TEXT,
-      hotel_code TEXT,
-      flight TEXT,
-      reason TEXT,
-      staff_number TEXT NOT NULL,
-      service_text TEXT,
-      authorized_value REAL,
-      created_at TEXT NOT NULL,
-      used_at TEXT,
-      used_by TEXT,
-      meta_json TEXT,
-      batch_id TEXT NOT NULL
-    );
+      CREATE TABLE IF NOT EXISTS vouchers (
+        id TEXT PRIMARY KEY,
+        voucher_type TEXT NOT NULL,
+        subtype TEXT,
+        status TEXT NOT NULL,
+        vendor_code TEXT,
+        hotel_code TEXT,
+        flight TEXT,
+        reason TEXT,
+        staff_number TEXT NOT NULL,
+        service_text TEXT,
+        authorized_value REAL,
+        created_at TEXT NOT NULL,
+        used_at TEXT,
+        used_by TEXT,
+        meta_json TEXT,
+        batch_id TEXT NOT NULL
+      );
 
-    CREATE TABLE IF NOT EXISTS batches (
-      batch_id TEXT PRIMARY KEY,
-      voucher_type TEXT NOT NULL,
-      file_name TEXT NOT NULL,
-      count INTEGER NOT NULL,
-      staff_number TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      pdf_key TEXT
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS batches (
+        batch_id TEXT PRIMARY KEY,
+        voucher_type TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        staff_number TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        pdf_key TEXT
+      );
+    `);
 
-  for (const row of seedStaff) {
-    await env.DB.prepare("INSERT OR IGNORE INTO staff (staff_number, name, status, role) VALUES (?, ?, ?, ?)")
-      .bind(row.staff_number, row.name, row.status, row.role)
-      .run();
+    for (const row of seedStaff) {
+      await env.DB.prepare("INSERT OR IGNORE INTO staff (staff_number, name, status, role) VALUES (?, ?, ?, ?)")
+        .bind(row.staff_number, row.name, row.status, row.role)
+        .run();
+    }
+
+    for (const row of seedVendors) {
+      await env.DB.prepare("INSERT OR IGNORE INTO vendors (vendor_code, vendor_name, billing_type, value_amount, combo_text, locations_text, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(row.vendor_code, row.vendor_name, row.billing_type, row.value_amount, row.combo_text, row.locations_text, row.pin, row.status)
+        .run();
+    }
+
+    for (const row of seedHotels) {
+      await env.DB.prepare("INSERT OR IGNORE INTO hotels (hotel_code, hotel_name, address, phone, shuttle_info, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        .bind(row.hotel_code, row.hotel_name, row.address, row.phone, row.shuttle_info, row.pin, row.status)
+        .run();
+    }
+
+    globalState.db_setup_issue = "";
+    d1Ready = true;
+    return true;
+  } catch (error) {
+    globalState.db_setup_issue = String(error && error.message ? error.message : error);
+    memEnsureSeed();
+    return false;
   }
-
-  for (const row of seedVendors) {
-    await env.DB.prepare("INSERT OR IGNORE INTO vendors (vendor_code, vendor_name, billing_type, value_amount, combo_text, locations_text, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(row.vendor_code, row.vendor_name, row.billing_type, row.value_amount, row.combo_text, row.locations_text, row.pin, row.status)
-      .run();
-  }
-
-  for (const row of seedHotels) {
-    await env.DB.prepare("INSERT OR IGNORE INTO hotels (hotel_code, hotel_name, address, phone, shuttle_info, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .bind(row.hotel_code, row.hotel_name, row.address, row.phone, row.shuttle_info, row.pin, row.status)
-      .run();
-  }
-
-  d1Ready = true;
-  return true;
 }
 
+export function dbSetupIssue(env) {
+  if (env && env.DB && globalState.db_setup_issue) {
+    return globalState.db_setup_issue;
+  }
+  return "";
+}
 async function nextVoucherSequence(env, prefix) {
   if (!(await ensureD1(env))) {
     const count = globalState.vouchers.filter((x) => x.id.startsWith(prefix)).length + 1;
@@ -658,3 +672,4 @@ export function reportToCsv(report) {
   }
   return lines.join("\n");
 }
+

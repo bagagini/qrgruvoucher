@@ -44,3 +44,11 @@ export function yyyymmddFromIso(iso) {
 export function makeToken() {
   return `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
 }
+
+export function dbSetupErrorResponse(details) {
+  return json({
+    error: "DB_SETUP_REQUIRED",
+    message: "Database setup is incomplete. Apply schema/seed and verify D1 binding.",
+    details: String(details || "")
+  }, 503);
+}

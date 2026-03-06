@@ -1,5 +1,6 @@
 import { requireSession } from "./_auth.js";
-import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+import { dbSetupIssue } from "./_db.js";
+import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
 
 const EMAIL_TO = "grukkqr@br.qatarairways.com";
 
@@ -45,6 +46,9 @@ export async function onRequest(context) {
 
   const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
   if (!auth.ok) return auth.response;
+
+  const setupIssue = dbSetupIssue(context.env);
+  if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
   const body = await readJson(context.request);
   const fileName = String(body.file_name || "voucher_batch.pdf").trim();

@@ -7,8 +7,8 @@
     {
       "binding": "DB",
       "database_name": "qrgruvoucher-db",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
-      "preview_database_id": "REPLACE_WITH_D1_PREVIEW_DATABASE_ID"
+      "database_id": "eec919fb-c86d-47e4-9d42-9920f8c7a13a",
+      "preview_database_id": "eec919fb-c86d-47e4-9d42-9920f8c7a13a"
     }
   ],
   "r2_buckets": [

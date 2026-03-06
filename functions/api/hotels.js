@@ -1,11 +1,13 @@
 import { requireSession } from "./_auth.js";
-import { listHotels, upsertHotel } from "./_db.js";
-import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+import { dbSetupIssue, listHotels, upsertHotel } from "./_db.js";
+import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
 
 export async function onRequest(context) {
   if (context.request.method === "GET") {
     const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
     if (!auth.ok) return auth.response;
+    const setupIssue = dbSetupIssue(context.env);
+    if (setupIssue) return dbSetupErrorResponse(setupIssue);
     const hotels = await listHotels(context.env);
     return json({ hotels });
   }
@@ -13,6 +15,8 @@ export async function onRequest(context) {
   if (["POST", "PUT"].includes(context.request.method)) {
     const auth = await requireSession(context, ["SUPERVISOR"]);
     if (!auth.ok) return auth.response;
+    const setupIssue = dbSetupIssue(context.env);
+    if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
     const body = await readJson(context.request);
     if (!body.hotel_code || !body.hotel_name) {

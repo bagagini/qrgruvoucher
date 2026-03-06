@@ -1,6 +1,6 @@
 import { requireSession } from "./_auth.js";
-import { issueHotelBatch, listHotels } from "./_db.js";
-import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+import { dbSetupIssue, issueHotelBatch, listHotels } from "./_db.js";
+import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
 
 export async function onRequest(context) {
   if (context.request.method !== "POST") {
@@ -9,6 +9,9 @@ export async function onRequest(context) {
 
   const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
   if (!auth.ok) return auth.response;
+
+  const setupIssue = dbSetupIssue(context.env);
+  if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
   const body = await readJson(context.request);
   const quantity = Number(body.quantity || 0);

@@ -1,6 +1,6 @@
 import { requireSession } from "./_auth.js";
-import { issueMealBatch, listVendors } from "./_db.js";
-import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+import { dbSetupIssue, issueMealBatch, listVendors } from "./_db.js";
+import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
 
 const allowedInad = ["Breakfast", "Lunch", "Dinner"];
 
@@ -11,6 +11,9 @@ export async function onRequest(context) {
 
   const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
   if (!auth.ok) return auth.response;
+
+  const setupIssue = dbSetupIssue(context.env);
+  if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
   const body = await readJson(context.request);
   const mode = String(body.mode || "normal").trim().toLowerCase();

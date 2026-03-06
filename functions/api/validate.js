@@ -1,11 +1,14 @@
 import { requireSession } from "./_auth.js";
-import { getVoucherById, latestVouchers, markVoucherUsed } from "./_db.js";
-import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+import { dbSetupIssue, getVoucherById, latestVouchers, markVoucherUsed } from "./_db.js";
+import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
 
 export async function onRequest(context) {
   if (context.request.method === "GET") {
     const auth = await requireSession(context, ["VENDOR", "HOTEL"]);
     if (!auth.ok) return auth.response;
+
+    const setupIssue = dbSetupIssue(context.env);
+    if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
     const vouchers = await latestVouchers(context.env, 1000);
     const scoped = vouchers.filter((v) => {
@@ -41,6 +44,9 @@ export async function onRequest(context) {
 
   const auth = await requireSession(context, ["VENDOR", "HOTEL"]);
   if (!auth.ok) return auth.response;
+
+  const setupIssue = dbSetupIssue(context.env);
+  if (setupIssue) return dbSetupErrorResponse(setupIssue);
 
   const body = await readJson(context.request);
   const voucherId = String(body.voucher_id || "").trim();
