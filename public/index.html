@@ -182,6 +182,8 @@
     }
 
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .inline-actions { display: flex; gap: 6px; margin-top: 6px; }
+    .list button { width: auto; padding: 6px 9px; font-size: 0.78rem; }
 
     @media (max-width: 910px) {
       .layout { grid-template-columns: 1fr; }
@@ -363,6 +365,45 @@
           </div>
           <p id="emailStatus" class="status"></p>
         </article>
+
+        <article class="card hidden" id="adminCard">
+          <h2>Administração de Catálogos</h2>
+          <p class="small">Supervisor pode alterar Vendors e Hotels (campos editáveis: id e name).</p>
+          <div class="grid" style="margin-top: 8px;">
+            <div>
+              <label for="newVendorId">Novo Vendor (ID)</label>
+              <input id="newVendorId" placeholder="v-10">
+            </div>
+            <div>
+              <label for="newVendorName">Novo Vendor (Nome)</label>
+              <input id="newVendorName" placeholder="Nome do vendor">
+            </div>
+            <div>
+              <label for="newHotelId">Novo Hotel (ID)</label>
+              <input id="newHotelId" placeholder="h-10">
+            </div>
+            <div>
+              <label for="newHotelName">Novo Hotel (Nome)</label>
+              <input id="newHotelName" placeholder="Nome do hotel">
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="addVendorButton" type="button">Adicionar Vendor</button>
+            <button id="addHotelButton" type="button">Adicionar Hotel</button>
+            <button id="refreshCatalogButton" type="button">Atualizar Catálogos</button>
+          </div>
+          <p id="adminStatus" class="status"></p>
+          <div class="grid" style="margin-top: 10px;">
+            <div>
+              <h3 class="small">Vendors</h3>
+              <ul id="adminVendorsList" class="list"></ul>
+            </div>
+            <div>
+              <h3 class="small">Hotels</h3>
+              <ul id="adminHotelsList" class="list"></ul>
+            </div>
+          </div>
+        </article>
       </section>
     </div>
   </main>
@@ -411,7 +452,18 @@
       emailSubject: document.getElementById("emailSubject"),
       emailText: document.getElementById("emailText"),
       sendEmailButton: document.getElementById("sendEmailButton"),
-      emailStatus: document.getElementById("emailStatus")
+      emailStatus: document.getElementById("emailStatus"),
+      adminCard: document.getElementById("adminCard"),
+      newVendorId: document.getElementById("newVendorId"),
+      newVendorName: document.getElementById("newVendorName"),
+      newHotelId: document.getElementById("newHotelId"),
+      newHotelName: document.getElementById("newHotelName"),
+      addVendorButton: document.getElementById("addVendorButton"),
+      addHotelButton: document.getElementById("addHotelButton"),
+      refreshCatalogButton: document.getElementById("refreshCatalogButton"),
+      adminStatus: document.getElementById("adminStatus"),
+      adminVendorsList: document.getElementById("adminVendorsList"),
+      adminHotelsList: document.getElementById("adminHotelsList")
     };
 
     async function api(path, options = {}, extraHeaders = {}) {
@@ -462,6 +514,11 @@
       });
     }
 
+    function slugifyCatalogId(value, prefix) {
+      const cleaned = String(value || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+      return cleaned || `${prefix}-${Date.now()}`;
+    }
+
     async function loadCatalogs() {
       const [vendorsRes, hotelsRes] = await Promise.all([
         api("/api/vendors"),
@@ -495,18 +552,94 @@
       if (el.filterTo.value.trim()) params.set("to", el.filterTo.value.trim());
       params.set("limit", "50");
 
-      const res = await api(
-        "/api/reports?" + params.toString(),
-        {},
-        { "x-supervisor-token": state.supervisorToken }
-      );
-
+      const res = await api("/api/reports?" + params.toString(), {}, { "x-supervisor-token": state.supervisorToken });
       renderList(
         el.reportsList,
         res.reports || [],
         "Nenhum relatório encontrado.",
         (item) => `<div><b>${item.category}</b> - staff ${item.staffNumber}</div><div>${item.message}</div><div class="small mono">${item.createdAt}</div>`
       );
+    }
+
+    function renderAdminCatalog(listNode, items, type) {
+      renderList(
+        listNode,
+        items,
+        `Nenhum ${type} cadastrado.`,
+        (item) => `
+          <div><b>${item.name}</b></div>
+          <div class="small mono">${item.id}</div>
+          <div class="inline-actions">
+            <button type="button" data-action="edit-${type}" data-id="${item.id}" data-name="${item.name}">Editar</button>
+            <button type="button" data-action="delete-${type}" data-id="${item.id}">Excluir</button>
+          </div>
+        `
+      );
+    }
+
+    async function loadAdminCatalogs() {
+      const [vendorsRes, hotelsRes] = await Promise.all([
+        api("/api/admin/vendors", {}, { "x-supervisor-token": state.supervisorToken }),
+        api("/api/admin/hotels", {}, { "x-supervisor-token": state.supervisorToken })
+      ]);
+
+      renderAdminCatalog(el.adminVendorsList, vendorsRes.vendors || [], "vendor");
+      renderAdminCatalog(el.adminHotelsList, hotelsRes.hotels || [], "hotel");
+    }
+
+    function bindCatalogActions(listNode, type) {
+      listNode.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+          return;
+        }
+
+        const action = target.getAttribute("data-action") || "";
+        const id = target.getAttribute("data-id") || "";
+        if (!action || !id) {
+          return;
+        }
+
+        if (!state.supervisorToken) {
+          showStatus(el.adminStatus, "Faça login de supervisor primeiro.", "warn");
+          return;
+        }
+
+        try {
+          if (action.startsWith("edit-")) {
+            const currentName = target.getAttribute("data-name") || "";
+            const nextName = window.prompt(`Novo nome para ${id}:`, currentName);
+            if (!nextName || !nextName.trim()) {
+              return;
+            }
+
+            await api(`/api/admin/${type}s`, {
+              method: "PUT",
+              body: JSON.stringify({ id, name: nextName.trim() })
+            }, { "x-supervisor-token": state.supervisorToken });
+
+            showStatus(el.adminStatus, `${type} atualizado.`, "ok");
+          }
+
+          if (action.startsWith("delete-")) {
+            const confirmDelete = window.confirm(`Excluir ${type} ${id}?`);
+            if (!confirmDelete) {
+              return;
+            }
+
+            await api(`/api/admin/${type}s?id=${encodeURIComponent(id)}`, {
+              method: "DELETE"
+            }, { "x-supervisor-token": state.supervisorToken });
+
+            showStatus(el.adminStatus, `${type} removido.`, "ok");
+          }
+
+          await loadCatalogs();
+          await loadAdminCatalogs();
+        } catch (error) {
+          showStatus(el.adminStatus, error.message, "warn");
+        }
+      });
     }
 
     el.loginButton.addEventListener("click", async () => {
@@ -598,7 +731,6 @@
         showStatus(el.reportStatus, error.message, "warn");
       }
     });
-
     el.supervisorLoginButton.addEventListener("click", async () => {
       const staffNumber = el.supervisorStaff.value.trim();
       const pin = el.supervisorPin.value.trim();
@@ -618,7 +750,9 @@
         el.runtimeInfo.textContent = "Modo: operador + supervisor";
         el.reportsCard.classList.remove("hidden");
         el.emailCard.classList.remove("hidden");
+        el.adminCard.classList.remove("hidden");
         await refreshReports();
+        await loadAdminCatalogs();
       } catch (error) {
         showStatus(el.supervisorStatus, error.message, "warn");
       }
@@ -635,6 +769,82 @@
         showStatus(el.supervisorStatus, error.message, "warn");
       }
     });
+
+    el.refreshCatalogButton.addEventListener("click", async () => {
+      if (!state.supervisorToken) {
+        showStatus(el.adminStatus, "Faça login de supervisor primeiro.", "warn");
+        return;
+      }
+
+      try {
+        await loadCatalogs();
+        await loadAdminCatalogs();
+        showStatus(el.adminStatus, "Catálogos atualizados.", "ok");
+      } catch (error) {
+        showStatus(el.adminStatus, error.message, "warn");
+      }
+    });
+
+    el.addVendorButton.addEventListener("click", async () => {
+      if (!state.supervisorToken) {
+        showStatus(el.adminStatus, "Faça login de supervisor primeiro.", "warn");
+        return;
+      }
+
+      const id = slugifyCatalogId(el.newVendorId.value, "v");
+      const name = el.newVendorName.value.trim();
+      if (!name) {
+        showStatus(el.adminStatus, "Nome do vendor é obrigatório.", "warn");
+        return;
+      }
+
+      try {
+        await api("/api/admin/vendors", {
+          method: "POST",
+          body: JSON.stringify({ id, name })
+        }, { "x-supervisor-token": state.supervisorToken });
+
+        el.newVendorId.value = "";
+        el.newVendorName.value = "";
+        await loadCatalogs();
+        await loadAdminCatalogs();
+        showStatus(el.adminStatus, "Vendor adicionado.", "ok");
+      } catch (error) {
+        showStatus(el.adminStatus, error.message, "warn");
+      }
+    });
+
+    el.addHotelButton.addEventListener("click", async () => {
+      if (!state.supervisorToken) {
+        showStatus(el.adminStatus, "Faça login de supervisor primeiro.", "warn");
+        return;
+      }
+
+      const id = slugifyCatalogId(el.newHotelId.value, "h");
+      const name = el.newHotelName.value.trim();
+      if (!name) {
+        showStatus(el.adminStatus, "Nome do hotel é obrigatório.", "warn");
+        return;
+      }
+
+      try {
+        await api("/api/admin/hotels", {
+          method: "POST",
+          body: JSON.stringify({ id, name })
+        }, { "x-supervisor-token": state.supervisorToken });
+
+        el.newHotelId.value = "";
+        el.newHotelName.value = "";
+        await loadCatalogs();
+        await loadAdminCatalogs();
+        showStatus(el.adminStatus, "Hotel adicionado.", "ok");
+      } catch (error) {
+        showStatus(el.adminStatus, error.message, "warn");
+      }
+    });
+
+    bindCatalogActions(el.adminVendorsList, "vendor");
+    bindCatalogActions(el.adminHotelsList, "hotel");
 
     el.sendEmailButton.addEventListener("click", async () => {
       const to = el.emailTo.value.trim();

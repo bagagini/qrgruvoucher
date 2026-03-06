@@ -114,6 +114,111 @@ export async function listHotels(env) {
   return rows.results || [];
 }
 
+export async function createVendor(env, data) {
+  const item = {
+    id: String(data.id || "").trim(),
+    name: String(data.name || "").trim()
+  };
+
+  if (!(await ensureD1(env))) {
+    memory.vendors.push(item);
+    return item;
+  }
+
+  await env.DB.prepare("INSERT INTO vendors (id, name) VALUES (?, ?)")
+    .bind(item.id, item.name)
+    .run();
+  return item;
+}
+
+export async function updateVendor(env, data) {
+  const item = {
+    id: String(data.id || "").trim(),
+    name: String(data.name || "").trim()
+  };
+
+  if (!(await ensureD1(env))) {
+    const index = memory.vendors.findIndex((row) => row.id === item.id);
+    if (index === -1) {
+      return false;
+    }
+    memory.vendors[index] = item;
+    return true;
+  }
+
+  const result = await env.DB.prepare("UPDATE vendors SET name = ? WHERE id = ?")
+    .bind(item.name, item.id)
+    .run();
+  return Boolean(result.meta && result.meta.changes);
+}
+
+export async function deleteVendor(env, id) {
+  const cleanId = String(id || "").trim();
+
+  if (!(await ensureD1(env))) {
+    const before = memory.vendors.length;
+    memory.vendors = memory.vendors.filter((row) => row.id !== cleanId);
+    return memory.vendors.length < before;
+  }
+
+  const result = await env.DB.prepare("DELETE FROM vendors WHERE id = ?")
+    .bind(cleanId)
+    .run();
+  return Boolean(result.meta && result.meta.changes);
+}
+
+export async function createHotel(env, data) {
+  const item = {
+    id: String(data.id || "").trim(),
+    name: String(data.name || "").trim()
+  };
+
+  if (!(await ensureD1(env))) {
+    memory.hotels.push(item);
+    return item;
+  }
+
+  await env.DB.prepare("INSERT INTO hotels (id, name) VALUES (?, ?)")
+    .bind(item.id, item.name)
+    .run();
+  return item;
+}
+
+export async function updateHotel(env, data) {
+  const item = {
+    id: String(data.id || "").trim(),
+    name: String(data.name || "").trim()
+  };
+
+  if (!(await ensureD1(env))) {
+    const index = memory.hotels.findIndex((row) => row.id === item.id);
+    if (index === -1) {
+      return false;
+    }
+    memory.hotels[index] = item;
+    return true;
+  }
+
+  const result = await env.DB.prepare("UPDATE hotels SET name = ? WHERE id = ?")
+    .bind(item.name, item.id)
+    .run();
+  return Boolean(result.meta && result.meta.changes);
+}
+
+export async function deleteHotel(env, id) {
+  const cleanId = String(id || "").trim();
+
+  if (!(await ensureD1(env))) {
+    const before = memory.hotels.length;
+    memory.hotels = memory.hotels.filter((row) => row.id !== cleanId);
+    return memory.hotels.length < before;
+  }
+
+  const result = await env.DB.prepare("DELETE FROM hotels WHERE id = ?")
+    .bind(cleanId)
+    .run();
+  return Boolean(result.meta && result.meta.changes);
+}
 export async function issueMealVoucher(env, data) {
   const voucher = {
     id: makeId("meal"),
@@ -357,3 +462,5 @@ export async function validateSupervisorSession(env, token) {
 
   return Boolean(session);
 }
+
+
