@@ -1,15 +1,661 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-<title>GRU QR Voucher System</title>
-<meta charset="UTF-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRU QR Voucher System</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+    :root {
+      --bg-top: #f0f6ff;
+      --bg-bottom: #e4f0ff;
+      --card: #ffffff;
+      --ink: #15253a;
+      --ink-muted: #567092;
+      --line: #cddced;
+      --primary: #0067c6;
+      --primary-dark: #00488c;
+      --ok: #177245;
+      --warn: #a95f00;
+      --shadow: 0 12px 28px rgba(18, 60, 111, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", Arial, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(0, 103, 198, 0.12), transparent 45%),
+        radial-gradient(circle at 90% 10%, rgba(0, 72, 140, 0.14), transparent 35%),
+        linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+      min-height: 100vh;
+    }
+
+    .shell {
+      max-width: 1150px;
+      margin: 0 auto;
+      padding: 28px 16px 38px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      letter-spacing: 0.2px;
+      font-size: clamp(1.45rem, 2.3vw, 2rem);
+    }
+
+    .subtitle {
+      margin: 4px 0 0;
+      color: var(--ink-muted);
+      font-size: 0.94rem;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #f9fbff;
+      color: var(--ink-muted);
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1.2fr 1fr;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: 14px;
+      padding: 16px;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 1.02rem;
+      font-family: "Space Grotesk", sans-serif;
+    }
+
+    .small {
+      color: var(--ink-muted);
+      font-size: 0.86rem;
+      margin: 0;
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 0.82rem;
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    input, select, textarea, button {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: inherit;
+      font-size: 0.93rem;
+      background: #fff;
+    }
+
+    textarea { resize: vertical; min-height: 72px; }
+
+    button {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border-color: transparent;
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--line);
+      background: #f9fbff;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 0.86rem;
+      color: var(--ink-muted);
+      font-weight: 600;
+    }
+
+    .mode input { width: auto; margin: 0; }
+
+    .status {
+      min-height: 18px;
+      margin: 8px 0 0;
+      font-size: 0.85rem;
+    }
+
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+
+    .hidden { display: none; }
+
+    .list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+
+    .list li {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.86rem;
+      background: #fcfdff;
+    }
+
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+    @media (max-width: 910px) {
+      .layout { grid-template-columns: 1fr; }
+      .hero { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
 </head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <h1>GRU QR Voucher System</h1>
+        <p class="subtitle">System is running.</p>
+      </div>
+      <div class="pill" id="runtimeInfo">Modo: aguardando login</div>
+    </header>
 
-<body style="font-family: Arial; text-align:center; margin-top:100px;">
+    <div class="layout">
+      <section class="stack">
+        <article class="card">
+          <h2>Login de Operador</h2>
+          <div class="grid">
+            <div>
+              <label for="staffNumber">Matrícula</label>
+              <input id="staffNumber" placeholder="Ex: 12345">
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="loginButton" type="button">Entrar</button>
+          </div>
+          <p id="loginStatus" class="status"></p>
+        </article>
 
-<h1>GRU QR Voucher System</h1>
+        <article class="card hidden" id="voucherCard">
+          <h2>Emissão de Voucher</h2>
+          <div class="row" style="margin-bottom: 10px;">
+            <label class="mode"><input type="radio" name="voucherMode" value="meal" checked> Refeição</label>
+            <label class="mode"><input type="radio" name="voucherMode" value="hotel"> Hotel</label>
+          </div>
 
-<p>System is running.</p>
+          <div class="grid">
+            <div>
+              <label for="passengerName">Passageiro</label>
+              <input id="passengerName" placeholder="Opcional">
+            </div>
+          </div>
 
+          <div id="mealFields" class="grid" style="margin-top: 10px;">
+            <div>
+              <label for="mealVendor">Fornecedor</label>
+              <select id="mealVendor"></select>
+            </div>
+            <div>
+              <label for="mealType">Tipo de refeição</label>
+              <select id="mealType">
+                <option value="normal">Normal</option>
+                <option value="INAD">INAD</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="hotelFields" class="grid hidden" style="margin-top: 10px;">
+            <div>
+              <label for="hotelId">Hotel</label>
+              <select id="hotelId"></select>
+            </div>
+            <div>
+              <label for="roomQuantity">Qtd. quartos</label>
+              <input id="roomQuantity" type="number" min="1" value="1">
+            </div>
+          </div>
+
+          <div class="row" style="margin-top: 10px;">
+            <button id="issueButton" type="button">Emitir Voucher</button>
+          </div>
+          <p id="voucherStatus" class="status"></p>
+        </article>
+
+        <article class="card hidden" id="staffReportCard">
+          <h2>Relato Operacional</h2>
+          <p class="small">Área de relato para supervisão.</p>
+          <div class="grid" style="margin-top: 8px;">
+            <div>
+              <label for="reportCategory">Categoria</label>
+              <select id="reportCategory">
+                <option value="general">General</option>
+                <option value="meal">Meal</option>
+                <option value="hotel">Hotel</option>
+                <option value="incident">Incident</option>
+              </select>
+            </div>
+            <div>
+              <label for="reportMessage">Mensagem</label>
+              <textarea id="reportMessage" placeholder="Descreva o ocorrido"></textarea>
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="reportButton" type="button">Enviar Relato</button>
+          </div>
+          <p id="reportStatus" class="status"></p>
+        </article>
+      </section>
+
+      <section class="stack">
+        <article class="card hidden" id="latestCard">
+          <h2>Últimos Vouchers Emitidos</h2>
+          <ul id="latestList" class="list"></ul>
+        </article>
+
+        <article class="card">
+          <h2>Acesso Supervisor</h2>
+          <div class="grid">
+            <div>
+              <label for="supervisorStaff">Matrícula Supervisor</label>
+              <input id="supervisorStaff" placeholder="Ex: 9001">
+            </div>
+            <div>
+              <label for="supervisorPin">PIN</label>
+              <input id="supervisorPin" type="password" placeholder="PIN">
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="supervisorLoginButton" type="button">Entrar como Supervisor</button>
+          </div>
+          <p id="supervisorStatus" class="status"></p>
+        </article>
+
+        <article class="card hidden" id="reportsCard">
+          <h2>Relatórios do Supervisor</h2>
+          <div class="grid">
+            <div>
+              <label for="filterStaff">Filtro matrícula</label>
+              <input id="filterStaff" placeholder="Opcional">
+            </div>
+            <div>
+              <label for="filterCategory">Categoria</label>
+              <select id="filterCategory">
+                <option value="">Todas</option>
+                <option value="general">General</option>
+                <option value="meal">Meal</option>
+                <option value="hotel">Hotel</option>
+                <option value="incident">Incident</option>
+              </select>
+            </div>
+            <div>
+              <label for="filterFrom">De (ISO)</label>
+              <input id="filterFrom" placeholder="2026-03-01T00:00:00.000Z">
+            </div>
+            <div>
+              <label for="filterTo">Até (ISO)</label>
+              <input id="filterTo" placeholder="2026-03-06T23:59:59.999Z">
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="loadReportsButton" type="button">Atualizar Relatórios</button>
+          </div>
+          <ul id="reportsList" class="list" style="margin-top: 10px;"></ul>
+        </article>
+
+        <article class="card hidden" id="emailCard">
+          <h2>E-mail (Provider Integrado)</h2>
+          <p class="small">Usa Resend ou SendGrid quando variáveis estiverem configuradas.</p>
+          <div class="grid" style="margin-top: 8px;">
+            <div>
+              <label for="emailTo">Para</label>
+              <input id="emailTo" type="email" placeholder="ops@example.com">
+            </div>
+            <div>
+              <label for="emailSubject">Assunto</label>
+              <input id="emailSubject" value="GRU Voucher Notification">
+            </div>
+            <div>
+              <label for="emailText">Mensagem</label>
+              <textarea id="emailText" placeholder="Mensagem do sistema"></textarea>
+            </div>
+          </div>
+          <div class="row" style="margin-top: 10px;">
+            <button id="sendEmailButton" type="button">Enviar E-mail</button>
+          </div>
+          <p id="emailStatus" class="status"></p>
+        </article>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      staffNumber: "",
+      supervisorToken: ""
+    };
+
+    const el = {
+      runtimeInfo: document.getElementById("runtimeInfo"),
+      staffNumber: document.getElementById("staffNumber"),
+      loginButton: document.getElementById("loginButton"),
+      loginStatus: document.getElementById("loginStatus"),
+      voucherCard: document.getElementById("voucherCard"),
+      mealFields: document.getElementById("mealFields"),
+      hotelFields: document.getElementById("hotelFields"),
+      mealVendor: document.getElementById("mealVendor"),
+      mealType: document.getElementById("mealType"),
+      hotelId: document.getElementById("hotelId"),
+      roomQuantity: document.getElementById("roomQuantity"),
+      passengerName: document.getElementById("passengerName"),
+      issueButton: document.getElementById("issueButton"),
+      voucherStatus: document.getElementById("voucherStatus"),
+      latestCard: document.getElementById("latestCard"),
+      latestList: document.getElementById("latestList"),
+      staffReportCard: document.getElementById("staffReportCard"),
+      reportCategory: document.getElementById("reportCategory"),
+      reportMessage: document.getElementById("reportMessage"),
+      reportButton: document.getElementById("reportButton"),
+      reportStatus: document.getElementById("reportStatus"),
+      supervisorStaff: document.getElementById("supervisorStaff"),
+      supervisorPin: document.getElementById("supervisorPin"),
+      supervisorLoginButton: document.getElementById("supervisorLoginButton"),
+      supervisorStatus: document.getElementById("supervisorStatus"),
+      reportsCard: document.getElementById("reportsCard"),
+      filterStaff: document.getElementById("filterStaff"),
+      filterCategory: document.getElementById("filterCategory"),
+      filterFrom: document.getElementById("filterFrom"),
+      filterTo: document.getElementById("filterTo"),
+      loadReportsButton: document.getElementById("loadReportsButton"),
+      reportsList: document.getElementById("reportsList"),
+      emailCard: document.getElementById("emailCard"),
+      emailTo: document.getElementById("emailTo"),
+      emailSubject: document.getElementById("emailSubject"),
+      emailText: document.getElementById("emailText"),
+      sendEmailButton: document.getElementById("sendEmailButton"),
+      emailStatus: document.getElementById("emailStatus")
+    };
+
+    async function api(path, options = {}, extraHeaders = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+          ...extraHeaders
+        }
+      });
+
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || "Request failed");
+      }
+      return data;
+    }
+
+    function showStatus(node, text, kind = "ok") {
+      node.className = "status " + kind;
+      node.textContent = text;
+    }
+
+    function toggleMode(mode) {
+      el.mealFields.classList.toggle("hidden", mode !== "meal");
+      el.hotelFields.classList.toggle("hidden", mode !== "hotel");
+    }
+
+    function renderList(node, items, emptyText, formatItem) {
+      node.innerHTML = "";
+      if (!items.length) {
+        const li = document.createElement("li");
+        li.textContent = emptyText;
+        node.appendChild(li);
+        return;
+      }
+      items.forEach((item) => {
+        const li = document.createElement("li");
+        li.innerHTML = formatItem(item);
+        node.appendChild(li);
+      });
+    }
+
+    async function loadCatalogs() {
+      const [vendorsRes, hotelsRes] = await Promise.all([
+        api("/api/vendors"),
+        api("/api/hotels")
+      ]);
+
+      el.mealVendor.innerHTML = (vendorsRes.vendors || []).map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+      el.hotelId.innerHTML = (hotelsRes.hotels || []).map((x) => `<option value="${x.id}">${x.name}</option>`).join("");
+    }
+
+    async function refreshLatest() {
+      const res = await api("/api/latest?limit=20");
+      renderList(
+        el.latestList,
+        res.vouchers || [],
+        "Nenhum voucher emitido.",
+        (item) => {
+          const details = item.type === "meal"
+            ? `Meal/<b>${item.mealType || "normal"}</b> - ${item.vendorName || "-"}`
+            : `Hotel <b>${item.hotelName || "-"}</b> x${item.roomQuantity || 1}`;
+          return `<div>${details}</div><div class="small mono">${item.id} | staff ${item.staffNumber} | ${new Date(item.issuedAt).toLocaleString()}</div>`;
+        }
+      );
+    }
+
+    async function refreshReports() {
+      const params = new URLSearchParams();
+      if (el.filterStaff.value.trim()) params.set("staffNumber", el.filterStaff.value.trim());
+      if (el.filterCategory.value) params.set("category", el.filterCategory.value);
+      if (el.filterFrom.value.trim()) params.set("from", el.filterFrom.value.trim());
+      if (el.filterTo.value.trim()) params.set("to", el.filterTo.value.trim());
+      params.set("limit", "50");
+
+      const res = await api(
+        "/api/reports?" + params.toString(),
+        {},
+        { "x-supervisor-token": state.supervisorToken }
+      );
+
+      renderList(
+        el.reportsList,
+        res.reports || [],
+        "Nenhum relatório encontrado.",
+        (item) => `<div><b>${item.category}</b> - staff ${item.staffNumber}</div><div>${item.message}</div><div class="small mono">${item.createdAt}</div>`
+      );
+    }
+
+    el.loginButton.addEventListener("click", async () => {
+      const staffNumber = el.staffNumber.value.trim();
+      if (!staffNumber) {
+        showStatus(el.loginStatus, "Matrícula obrigatória.", "warn");
+        return;
+      }
+
+      try {
+        await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ staffNumber })
+        });
+
+        state.staffNumber = staffNumber;
+        el.runtimeInfo.textContent = "Modo: operador #" + staffNumber;
+        showStatus(el.loginStatus, "Login efetuado.", "ok");
+
+        await loadCatalogs();
+        await refreshLatest();
+
+        el.voucherCard.classList.remove("hidden");
+        el.latestCard.classList.remove("hidden");
+        el.staffReportCard.classList.remove("hidden");
+      } catch (error) {
+        showStatus(el.loginStatus, error.message, "warn");
+      }
+    });
+
+    document.querySelectorAll("input[name='voucherMode']").forEach((node) => {
+      node.addEventListener("change", (ev) => toggleMode(ev.target.value));
+    });
+
+    el.issueButton.addEventListener("click", async () => {
+      if (!state.staffNumber) {
+        showStatus(el.voucherStatus, "Faça login de operador primeiro.", "warn");
+        return;
+      }
+
+      const mode = document.querySelector("input[name='voucherMode']:checked").value;
+      const payload = {
+        staffNumber: state.staffNumber,
+        passengerName: el.passengerName.value.trim()
+      };
+
+      try {
+        if (mode === "meal") {
+          payload.vendorId = el.mealVendor.value;
+          payload.mealType = el.mealType.value;
+          await api("/api/issue-meal", { method: "POST", body: JSON.stringify(payload) });
+        } else {
+          payload.hotelId = el.hotelId.value;
+          payload.roomQuantity = Number(el.roomQuantity.value || 1);
+          await api("/api/issue-hotel", { method: "POST", body: JSON.stringify(payload) });
+        }
+
+        showStatus(el.voucherStatus, "Voucher emitido com sucesso.", "ok");
+        await refreshLatest();
+      } catch (error) {
+        showStatus(el.voucherStatus, error.message, "warn");
+      }
+    });
+
+    el.reportButton.addEventListener("click", async () => {
+      if (!state.staffNumber) {
+        showStatus(el.reportStatus, "Faça login de operador primeiro.", "warn");
+        return;
+      }
+
+      const message = el.reportMessage.value.trim();
+      if (!message) {
+        showStatus(el.reportStatus, "Mensagem do relato é obrigatória.", "warn");
+        return;
+      }
+
+      try {
+        await api("/api/report", {
+          method: "POST",
+          body: JSON.stringify({
+            staffNumber: state.staffNumber,
+            category: el.reportCategory.value,
+            message
+          })
+        });
+        el.reportMessage.value = "";
+        showStatus(el.reportStatus, "Relato enviado.", "ok");
+      } catch (error) {
+        showStatus(el.reportStatus, error.message, "warn");
+      }
+    });
+
+    el.supervisorLoginButton.addEventListener("click", async () => {
+      const staffNumber = el.supervisorStaff.value.trim();
+      const pin = el.supervisorPin.value.trim();
+      if (!staffNumber || !pin) {
+        showStatus(el.supervisorStatus, "Matrícula e PIN são obrigatórios.", "warn");
+        return;
+      }
+
+      try {
+        const res = await api("/api/supervisor-login", {
+          method: "POST",
+          body: JSON.stringify({ staffNumber, pin })
+        });
+
+        state.supervisorToken = res.token;
+        showStatus(el.supervisorStatus, "Supervisor autenticado.", "ok");
+        el.runtimeInfo.textContent = "Modo: operador + supervisor";
+        el.reportsCard.classList.remove("hidden");
+        el.emailCard.classList.remove("hidden");
+        await refreshReports();
+      } catch (error) {
+        showStatus(el.supervisorStatus, error.message, "warn");
+      }
+    });
+
+    el.loadReportsButton.addEventListener("click", async () => {
+      if (!state.supervisorToken) {
+        showStatus(el.supervisorStatus, "Faça login de supervisor primeiro.", "warn");
+        return;
+      }
+      try {
+        await refreshReports();
+      } catch (error) {
+        showStatus(el.supervisorStatus, error.message, "warn");
+      }
+    });
+
+    el.sendEmailButton.addEventListener("click", async () => {
+      const to = el.emailTo.value.trim();
+      const subject = el.emailSubject.value.trim();
+      const text = el.emailText.value.trim();
+
+      if (!to || !text) {
+        showStatus(el.emailStatus, "Preencha destinatário e mensagem.", "warn");
+        return;
+      }
+
+      try {
+        const res = await api("/api/send-email", {
+          method: "POST",
+          body: JSON.stringify({ to, subject, text })
+        });
+        showStatus(el.emailStatus, `Resultado: provider=${res.provider}, queued=${String(res.queued)}`, "ok");
+      } catch (error) {
+        showStatus(el.emailStatus, error.message, "warn");
+      }
+    });
+  </script>
 </body>
 </html>
