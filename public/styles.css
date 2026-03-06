@@ -1,0 +1,79 @@
+:root {
+  --bg: #f4f6fa;
+  --panel: #fff;
+  --line: #ccd6e2;
+  --ink: #1b2a3a;
+  --muted: #58708b;
+  --accent: #0058b5;
+  --ok: #0d7b43;
+  --warn: #aa5c00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, #f7fbff, var(--bg));
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.topbar h1 { margin: 0; font-size: 1.1rem; }
+.badge { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size: 0.82rem; }
+
+.container {
+  max-width: 1180px;
+  margin: 14px auto;
+  padding: 0 12px 16px;
+}
+
+.panel, .card {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab { border: 1px solid var(--line); background: #f8fbff; color: var(--ink); }
+.tab.active { background: var(--accent); color: #fff; }
+
+.card { margin-bottom: 10px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+
+label { display: block; font-size: 0.83rem; margin-bottom: 4px; color: var(--muted); }
+input, select, textarea, button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  font: inherit;
+}
+
+textarea { min-height: 70px; resize: vertical; }
+button { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+
+.status { min-height: 18px; margin: 8px 0 0; font-size: 0.85rem; }
+.status.ok { color: var(--ok); }
+.status.warn { color: var(--warn); }
+
+.hidden { display: none; }
+.list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.list li { border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 0.85rem; background: #fcfeff; }
+.summary { border: 1px solid var(--line); background: #f7fbff; border-radius: 8px; padding: 8px; overflow: auto; font-size: 0.82rem; }
+.checks { display: grid; gap: 4px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.actions button { width: auto; }
+
+@media (max-width: 700px) {
+  .topbar { flex-direction: column; align-items: flex-start; gap: 6px; }
+}

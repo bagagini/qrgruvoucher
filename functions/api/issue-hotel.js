@@ -1,38 +1,40 @@
-import { issueHotelVoucher, listHotels } from "./_store.js";
-import { json, methodNotAllowed, readJson, badRequest } from "./_utils.js";
+import { requireSession } from "./_auth.js";
+import { issueHotelBatch, listHotels } from "./_db.js";
+import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
 
 export async function onRequest(context) {
   if (context.request.method !== "POST") {
     return methodNotAllowed();
   }
 
+  const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
+  if (!auth.ok) return auth.response;
+
   const body = await readJson(context.request);
-  const staffNumber = String(body.staffNumber || "").trim();
-  const hotelId = String(body.hotelId || "").trim();
-  const passengerName = String(body.passengerName || "").trim();
-  const roomQuantity = Number(body.roomQuantity || 0);
-
-  if (!staffNumber) {
-    return badRequest("staffNumber is required");
-  }
-
-  if (!Number.isInteger(roomQuantity) || roomQuantity < 1) {
-    return badRequest("roomQuantity must be an integer >= 1");
+  const quantity = Number(body.quantity || 0);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 200) {
+    return badRequest("quantity must be integer between 1 and 200");
   }
 
   const hotels = await listHotels(context.env);
-  const hotel = hotels.find((item) => item.id === hotelId);
+  const hotel = hotels.find((x) => x.hotel_code === String(body.hotel_code || "").trim().toUpperCase());
   if (!hotel) {
-    return badRequest("Invalid hotelId");
+    return badRequest("Invalid hotel_code");
   }
 
-  const voucher = await issueHotelVoucher(context.env, {
-    staffNumber,
-    hotelId,
-    hotelName: hotel.name,
-    roomQuantity,
-    passengerName
+  const flight = String(body.flight || "").trim().toUpperCase();
+  const reason = String(body.reason || "").trim();
+  if (!flight || !reason) {
+    return badRequest("flight and reason are required");
+  }
+
+  const result = await issueHotelBatch(context.env, {
+    hotel,
+    quantity,
+    flight,
+    reason,
+    staff_number: auth.session.actor_id
   });
 
-  return json({ ok: true, voucher }, 201);
+  return json({ ok: true, ...result });
 }

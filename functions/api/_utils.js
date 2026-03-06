@@ -1,9 +1,10 @@
-export function json(data, status = 200) {
+export function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
+      "cache-control": "no-store",
+      ...extraHeaders
     }
   });
 }
@@ -16,10 +17,6 @@ export async function readJson(request) {
   }
 }
 
-export function methodNotAllowed() {
-  return json({ error: "Method not allowed" }, 405);
-}
-
 export function badRequest(message) {
   return json({ error: message }, 400);
 }
@@ -28,10 +25,22 @@ export function unauthorized(message = "Unauthorized") {
   return json({ error: message }, 401);
 }
 
-export function getSupervisorToken(request) {
-  const auth = request.headers.get("authorization") || "";
-  if (auth.toLowerCase().startsWith("bearer ")) {
-    return auth.slice(7).trim();
-  }
-  return (request.headers.get("x-supervisor-token") || "").trim();
+export function forbidden(message = "Forbidden") {
+  return json({ error: message }, 403);
+}
+
+export function methodNotAllowed() {
+  return json({ error: "Method not allowed" }, 405);
+}
+
+export function isoNow() {
+  return new Date().toISOString();
+}
+
+export function yyyymmddFromIso(iso) {
+  return String(iso).slice(0, 10).replace(/-/g, "");
+}
+
+export function makeToken() {
+  return `${crypto.randomUUID()}-${Math.random().toString(36).slice(2, 10)}`;
 }

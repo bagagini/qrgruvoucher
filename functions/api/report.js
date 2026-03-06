@@ -1,29 +1,28 @@
-import { createReport } from "./_store.js";
-import { json, methodNotAllowed, readJson, badRequest } from "./_utils.js";
+import { requireSession } from "./_auth.js";
+import { reportData, reportToCsv } from "./_db.js";
+import { json, methodNotAllowed, readJson } from "./_utils.js";
 
 export async function onRequest(context) {
   if (context.request.method !== "POST") {
     return methodNotAllowed();
   }
 
+  const auth = await requireSession(context, ["SUPERVISOR"]);
+  if (!auth.ok) return auth.response;
+
   const body = await readJson(context.request);
-  const staffNumber = String(body.staffNumber || "").trim();
-  const message = String(body.message || "").trim();
-  const category = String(body.category || "general").trim().toLowerCase();
+  const report = await reportData(context.env, body);
 
-  if (!staffNumber) {
-    return badRequest("staffNumber is required");
+  if (String(body.format || "json").toLowerCase() === "csv") {
+    const csv = reportToCsv(report);
+    return new Response(csv, {
+      status: 200,
+      headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename=report_${new Date().toISOString().slice(0, 10)}.csv`
+      }
+    });
   }
 
-  if (!message) {
-    return badRequest("message is required");
-  }
-
-  const report = await createReport(context.env, {
-    staffNumber,
-    message,
-    category
-  });
-
-  return json({ ok: true, report }, 201);
+  return json({ ok: true, report });
 }

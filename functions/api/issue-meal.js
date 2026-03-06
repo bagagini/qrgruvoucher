@@ -1,38 +1,68 @@
-import { issueMealVoucher, listVendors } from "./_store.js";
-import { json, methodNotAllowed, readJson, badRequest } from "./_utils.js";
+import { requireSession } from "./_auth.js";
+import { issueMealBatch, listVendors } from "./_db.js";
+import { badRequest, json, methodNotAllowed, readJson } from "./_utils.js";
+
+const allowedInad = ["Breakfast", "Lunch", "Dinner"];
 
 export async function onRequest(context) {
   if (context.request.method !== "POST") {
     return methodNotAllowed();
   }
 
+  const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
+  if (!auth.ok) return auth.response;
+
   const body = await readJson(context.request);
-  const staffNumber = String(body.staffNumber || "").trim();
-  const vendorId = String(body.vendorId || "").trim();
-  const mealType = String(body.mealType || "normal").trim();
-  const passengerName = String(body.passengerName || "").trim();
-
-  if (!staffNumber) {
-    return badRequest("staffNumber is required");
-  }
-
-  if (!["normal", "INAD"].includes(mealType)) {
-    return badRequest("mealType must be normal or INAD");
-  }
-
+  const mode = String(body.mode || "normal").trim().toLowerCase();
   const vendors = await listVendors(context.env);
-  const vendor = vendors.find((item) => item.id === vendorId);
+  const vendor = vendors.find((x) => x.vendor_code === String(body.vendor_code || "").trim().toUpperCase());
+
   if (!vendor) {
-    return badRequest("Invalid vendorId");
+    return badRequest("Invalid vendor_code");
   }
 
-  const voucher = await issueMealVoucher(context.env, {
-    staffNumber,
-    vendorId,
-    vendorName: vendor.name,
-    mealType,
-    passengerName
-  });
+  if (mode === "normal") {
+    const quantity = Number(body.quantity || 0);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 500) {
+      return badRequest("quantity must be integer between 1 and 500");
+    }
 
-  return json({ ok: true, voucher }, 201);
+    const flight = String(body.flight || "").trim().toUpperCase();
+    const reason = String(body.reason || "").trim();
+    if (!flight || !reason) {
+      return badRequest("flight and reason are required for normal meal");
+    }
+
+    const result = await issueMealBatch(context.env, {
+      mode,
+      vendor,
+      quantity,
+      flight,
+      reason,
+      staff_number: auth.session.actor_id
+    });
+
+    return json({ ok: true, ...result });
+  }
+
+  if (mode === "inad") {
+    const inadMeals = Array.isArray(body.inad_meals)
+      ? body.inad_meals.filter((x) => allowedInad.includes(String(x || "")))
+      : [];
+
+    if (!inadMeals.length) {
+      return badRequest("inad_meals must include Breakfast/Lunch/Dinner");
+    }
+
+    const result = await issueMealBatch(context.env, {
+      mode,
+      vendor,
+      inadMeals,
+      staff_number: auth.session.actor_id
+    });
+
+    return json({ ok: true, ...result });
+  }
+
+  return badRequest("mode must be normal or inad");
 }

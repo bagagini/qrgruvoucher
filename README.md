@@ -1,88 +1,158 @@
-# GRU QR Voucher System (Cloudflare Pages)
+# GRU Airport Disruption Voucher System
 
-App de vouchers aeroportuários para Cloudflare Pages usando:
-- Frontend estático em `public/`
-- Backend em Cloudflare Pages Functions em `functions/api/`
+Cloudflare Pages + Pages Functions implementation for airline disruption vouchers at GRU.
 
-## Entregue nesta versão
+## Stack
 
-- Login de operador por matrícula
-- Emissão de voucher:
-  - Refeição (`normal` e `INAD`)
-  - Hotel (com quantidade de quartos)
-- Últimos vouchers emitidos
-- Login de supervisor (separado)
-- Área de administração para supervisor (CRUD de Vendors e Hotels)
-- Relatórios com filtros (`staffNumber`, `category`, `from`, `to`, `limit`)
-- Envio de e-mail com provider (Resend ou SendGrid)
-- Persistência com D1 quando binding `DB` existe
-- Fallback para memória quando D1 não estiver configurado
+- Frontend: Cloudflare Pages (`public/`)
+- Backend: Cloudflare Pages Functions (`functions/api/`)
+- Database: Cloudflare D1
+- File Storage: Cloudflare R2
+- Language: Vanilla JavaScript + HTML + CSS
 
-## Rotas API
+## Features
 
-Obrigatórias:
+- Staff login by `staff_number`
+- Voucher issuance:
+  - Meal Normal
+  - Meal INAD (Breakfast/Lunch/Dinner as separate vouchers)
+  - Hotel
+- Batch PDF generation (A4, one voucher per page)
+- QR code generation (QR payload is voucher ID only)
+- Manual email sending (PDF attachment only)
+- Vendor/Hotel validation dashboard with PIN login
+- Supervisor reports with filters and exports (CSV + PDF summary)
+- Latest issued vouchers screen
+- Supervisor configuration for vendors/hotels
+
+## Business Rules Covered
+
+- Use cases: delay, cancellation, misconnection, INAD
+- Printable and operationally simple
+- Mobile-friendly layout
+- No intranet dependency
+- QR content: voucher ID only (no public URL)
+- INAD vouchers do not show value/flight/reason
+- Hotel print always shows `Room: 1` (internal index only in metadata)
+
+## Voucher ID Formats
+
+- Meal Normal: `ALI-YYYYMMDD-00001`
+- INAD:
+  - `ALI-INAD-B-YYYYMMDD-00001`
+  - `ALI-INAD-L-YYYYMMDD-00001`
+  - `ALI-INAD-D-YYYYMMDD-00001`
+- Hotel: `HOT-YYYYMMDD-00001`
+
+## File Names
+
+- Meal Normal: `MEAL_NORMAL_<flight>_<date>_<count>vouchers.pdf`
+- INAD: `MEAL_INAD_<count>meals_<date>.pdf`
+- Hotel: `HOTEL_<hotelcode>_<flight>_<date>_<count>rooms.pdf`
+
+## API Routes
+
 - `POST /api/login`
-- `GET /api/vendors`
-- `GET /api/hotels`
+- `GET|PUT|POST /api/vendors`
+- `GET|PUT|POST /api/hotels`
 - `POST /api/issue-meal`
 - `POST /api/issue-hotel`
 - `GET /api/latest`
 - `POST /api/report`
+- `POST|GET /api/validate`
 - `POST /api/send-email`
 
-Novas:
-- `POST /api/supervisor-login`
-- `GET /api/reports`
-- `GET /api/admin/vendors`
-- `POST /api/admin/vendors`
-- `PUT /api/admin/vendors`
-- `DELETE /api/admin/vendors?id=<id>`
-- `GET /api/admin/hotels`
-- `POST /api/admin/hotels`
-- `PUT /api/admin/hotels`
-- `DELETE /api/admin/hotels?id=<id>`
+## Repository Structure
 
-## Configuração local
+- `public/index.html`
+- `public/app.js`
+- `public/styles.css`
+- `public/templates/meal-voucher.html`
+- `public/templates/hotel-voucher.html`
+- `functions/api/login.js`
+- `functions/api/vendors.js`
+- `functions/api/hotels.js`
+- `functions/api/issue-meal.js`
+- `functions/api/issue-hotel.js`
+- `functions/api/latest.js`
+- `functions/api/report.js`
+- `functions/api/validate.js`
+- `functions/api/send-email.js`
+- `wrangler.json`
 
-Pré-requisitos:
-- Node.js 18+
-- Wrangler (`npm i -g wrangler`)
+## Local Setup
 
-1. (Opcional) Login no Cloudflare:
+1. Install Wrangler:
+
+```bash
+npm i -g wrangler
+```
+
+2. Login:
 
 ```bash
 wrangler login
 ```
 
-2. Crie/aplique D1 para persistência real:
+3. Create D1 database and apply schema:
 
 ```bash
 wrangler d1 create qrgruvoucher-db
 wrangler d1 execute qrgruvoucher-db --local --file=db/schema.sql
 ```
 
-3. Atualize `wrangler.toml` com IDs reais do D1.
+4. Update `wrangler.json` with real `database_id` and `preview_database_id`.
 
-4. Defina segredos:
+5. Create R2 buckets (or adjust names in `wrangler.json`):
 
 ```bash
-wrangler secret put SUPERVISOR_PIN
+wrangler r2 bucket create qrgruvoucher-files
+wrangler r2 bucket create qrgruvoucher-files-preview
+```
+
+6. Set secrets for email provider (manual email flow):
+
+```bash
 wrangler secret put EMAIL_FROM
 wrangler secret put RESEND_API_KEY
-# ou
-wrangler secret put SENDGRID_API_KEY
 ```
 
-5. Rode localmente:
+7. Run Pages locally:
 
 ```bash
-wrangler pages dev public --compatibility-date=2026-03-06
+wrangler pages dev public
 ```
 
-## Deploy no Cloudflare Pages
+## Deployment (Cloudflare Pages)
 
-1. Push para GitHub
-2. Pages > Create project
-3. Build command vazio; output `public`
-4. Configure binding D1 `DB` e secrets
-5. Deploy
+1. Push repository to GitHub.
+2. In Cloudflare Dashboard, create Pages project from repo.
+3. Build output directory: `public`.
+4. Configure Functions bindings:
+- D1 binding: `DB`
+- R2 binding: `VOUCHER_FILES`
+5. Configure secrets:
+- `EMAIL_FROM`
+- `RESEND_API_KEY`
+6. Deploy.
+
+## Operational Seed Data
+
+Seeded at first run via backend:
+
+- Vendors:
+  - GRUPOFIT (VALUE 149.90)
+  - VIENA (VALUE configurable, default 120)
+  - DELI365 (VALUE 70)
+- Hotels:
+  - PULLMAN_GRU
+  - PANAMBY_GRU
+  - MARRIOTT_GRU
+  - PANAMBY_BARRA
+  - PULLMAN_IBIRA
+  - IBIS_BUDGET_GRU
+  - IBIS_COMFORT_GRU
+- Staff:
+  - Supervisor and agent sample records
+
+Update PINs/config in supervisor screen or directly in D1.

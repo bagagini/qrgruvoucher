@@ -1,48 +1,65 @@
+CREATE TABLE IF NOT EXISTS staff (
+  staff_number TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  role TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS vendors (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  vendor_code TEXT PRIMARY KEY,
+  vendor_name TEXT NOT NULL,
+  billing_type TEXT NOT NULL,
+  value_amount REAL,
+  combo_text TEXT,
+  locations_text TEXT,
+  pin TEXT NOT NULL,
+  status TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS hotels (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  hotel_code TEXT PRIMARY KEY,
+  hotel_name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  shuttle_info TEXT NOT NULL,
+  pin TEXT NOT NULL,
+  status TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  token TEXT PRIMARY KEY,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS vouchers (
   id TEXT PRIMARY KEY,
-  type TEXT NOT NULL,
-  meal_type TEXT,
-  vendor_id TEXT,
-  vendor_name TEXT,
-  hotel_id TEXT,
-  hotel_name TEXT,
-  room_quantity INTEGER,
-  passenger_name TEXT,
+  voucher_type TEXT NOT NULL,
+  subtype TEXT,
+  status TEXT NOT NULL,
+  vendor_code TEXT,
+  hotel_code TEXT,
+  flight TEXT,
+  reason TEXT,
   staff_number TEXT NOT NULL,
-  issued_at TEXT NOT NULL
+  service_text TEXT,
+  authorized_value REAL,
+  created_at TEXT NOT NULL,
+  used_at TEXT,
+  used_by TEXT,
+  meta_json TEXT,
+  batch_id TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS reports (
-  id TEXT PRIMARY KEY,
-  staff_number TEXT NOT NULL,
-  category TEXT NOT NULL,
-  message TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS supervisor_sessions (
-  token TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS batches (
+  batch_id TEXT PRIMARY KEY,
+  voucher_type TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  count INTEGER NOT NULL,
   staff_number TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  expires_at TEXT NOT NULL
+  pdf_key TEXT
 );
-
-INSERT OR IGNORE INTO vendors (id, name) VALUES
-  ('v-1', 'GRU Food Court'),
-  ('v-2', 'Terminal Bistro'),
-  ('v-3', 'Airport Express Meals');
-
-INSERT OR IGNORE INTO hotels (id, name) VALUES
-  ('h-1', 'GRU Airport Hotel'),
-  ('h-2', 'Transit Suites Guarulhos'),
-  ('h-3', 'Terminal Comfort Inn');

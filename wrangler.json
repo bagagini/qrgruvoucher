@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "qrgruvoucher",
+  "compatibility_date": "2026-03-06",
+  "pages_build_output_dir": "public",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "qrgruvoucher-db",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "preview_database_id": "REPLACE_WITH_D1_PREVIEW_DATABASE_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "VOUCHER_FILES",
+      "bucket_name": "qrgruvoucher-files",
+      "preview_bucket_name": "qrgruvoucher-files-preview"
+    }
+  ],
+  "vars": {
+    "EMAIL_TO_KK": "grukkqr@br.qatarairways.com"
+  }
+}

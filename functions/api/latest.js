@@ -1,4 +1,5 @@
-import { listLatestVouchers } from "./_store.js";
+import { requireSession } from "./_auth.js";
+import { latestVouchers } from "./_db.js";
 import { json, methodNotAllowed } from "./_utils.js";
 
 export async function onRequest(context) {
@@ -6,8 +7,11 @@ export async function onRequest(context) {
     return methodNotAllowed();
   }
 
+  const auth = await requireSession(context, ["AGENT", "SUPERVISOR"]);
+  if (!auth.ok) return auth.response;
+
   const url = new URL(context.request.url);
-  const limit = Number(url.searchParams.get("limit") || 20);
-  const vouchers = await listLatestVouchers(context.env, limit);
+  const limit = Number(url.searchParams.get("limit") || 30);
+  const vouchers = await latestVouchers(context.env, limit);
   return json({ vouchers });
 }
