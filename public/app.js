@@ -612,12 +612,22 @@ function parseJsonObject(input, label) {
 }
 
 async function loadAdminTables() {
+  if (!state.supervisorToken) {
+    setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+    return;
+  }
+
   const res = await api("/api/admin-db?action=tables", {}, state.supervisorToken);
   state.adminTables = res.tables || [];
   el.adminTable.innerHTML = state.adminTables.map((t) => `<option value="${t}">${t}</option>`).join("");
 }
 
 async function loadAdminRows() {
+  if (!state.supervisorToken) {
+    setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+    return;
+  }
+
   const table = el.adminTable.value;
   if (!table) {
     setStatus(el.adminStatus, "Select a table", false);
@@ -650,6 +660,11 @@ el.adminLoadRowsButton.addEventListener("click", async () => {
 
 el.adminUpsertButton.addEventListener("click", async () => {
   try {
+    if (!state.supervisorToken) {
+      setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+      return;
+    }
+
     const table = el.adminTable.value;
     if (!table) {
       setStatus(el.adminStatus, "Select a table", false);
@@ -677,6 +692,11 @@ el.adminUpsertButton.addEventListener("click", async () => {
 
 el.adminDeleteButton.addEventListener("click", async () => {
   try {
+    if (!state.supervisorToken) {
+      setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+      return;
+    }
+
     const table = el.adminTable.value;
     if (!table) {
       setStatus(el.adminStatus, "Select a table", false);
@@ -742,4 +762,5 @@ el.validateVoucherButton.addEventListener("click", async () => {
 
 switchTab("issue");
 mealModeUI();
+setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
 
