@@ -283,70 +283,146 @@ async function buildVoucherPdf(vouchers, type, fileName) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
+  const formatDate = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  };
+
+  const mealTypeLine = (subtype) => {
+    const s = String(subtype || "").toLowerCase();
+    const b = s === "breakfast" ? "[X]" : "[ ]";
+    const l = s === "lunch" ? "[X]" : "[ ]";
+    const d = s === "dinner" ? "[X]" : "[ ]";
+    return `${b} BREAKFAST    ${l} LUNCH    ${d} DINNER`;
+  };
+
+  const grayRow = (text, y) => {
+    doc.setFillColor(224, 224, 224);
+    doc.rect(20, y, 170, 8, "F");
+    doc.setTextColor(20, 20, 20);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text(String(text || "-"), 22, y + 5.4);
+  };
+
   for (let i = 0; i < vouchers.length; i += 1) {
     const v = vouchers[i];
     if (i > 0) doc.addPage();
 
+    const isHotel = v.voucher_type === "HOTEL";
+    const isInad = v.voucher_type === "MEAL_INAD";
+
+    const vendor = state.vendors.find((x) => x.vendor_code === v.vendor_code) || {};
+    const hotel = state.hotels.find((x) => x.hotel_code === v.hotel_code) || {};
+
+    // Header band
+    doc.setFillColor(22, 22, 22);
+    doc.rect(20, 20, 170, 26, "F");
+
+    doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(type === "HOTEL" ? "HOTEL ACCOMMODATION VOUCHER" : "MEAL ACCOMMODATION ORDER", 12, 14);
+    doc.setFontSize(12.5);
+    doc.text(isHotel ? "Hotel Accommodation Transportation Order" : "Meal Accommodation Transportation Order", 24, 31);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
+    doc.text(`Voucher ${v.id}`, 24, 38);
 
-    let y = 24;
-    const write = (label, value) => {
-      doc.text(`${label}: ${value}`, 12, y);
-      y += 6;
-    };
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("QATAR", 167, 31, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("AIRWAYS", 167, 36, { align: "right" });
 
-    write("Layover", "GRU");
-    write("Date", new Date(v.created_at).toLocaleString());
+    doc.setTextColor(35, 35, 35);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.text(`LAYOVER POINT: GRU - ${v.flight || "-"} - DATE: ${formatDate(v.created_at)}`, 20, 56);
 
-    if (v.voucher_type === "MEAL_NORMAL") {
-      const vendor = state.vendors.find((x) => x.vendor_code === v.vendor_code) || {};
-      write("Flight", v.flight || "-");
-      write("Vendor", vendor.vendor_name || v.vendor_code);
+    let y = 62;
+
+    if (!isHotel) {
+      grayRow(`VENDOR: ${vendor.vendor_name || v.vendor_code || "-"}`, y);
+      y += 10;
+
+      grayRow(`MEAL TYPE: ${mealTypeLine(isInad ? v.subtype : "")}`, y);
+      y += 10;
+
+      grayRow("TOTAL MEALS: 1", y);
+      y += 12;
+
       const locations = linesFromLocations(vendor.locations_text || "");
-      write("Valid locations", locations.length ? locations.join(" | ") : "-");
-      write("Service", valueText(v, vendor));
-      write("Total meals", "1");
-    }
-
-    if (v.voucher_type === "MEAL_INAD") {
-      const vendor = state.vendors.find((x) => x.vendor_code === v.vendor_code) || {};
-      doc.setFont("helvetica", "bold");
-      doc.text("[INAD]", 170, 14);
       doc.setFont("helvetica", "normal");
-      write("Vendor", vendor.vendor_name || v.vendor_code);
-      write("Meal type", v.subtype || "-");
-      const locations = linesFromLocations(vendor.locations_text || "");
-      write("Valid locations", locations.length ? locations.join(" | ") : "-");
-      write("Service", v.service_text || "INAD passenger meal");
-      write("Total meals", "1");
+      doc.setFontSize(10);
+      const locList = locations.length ? locations : ["Partner location will validate this voucher."];
+      locList.slice(0, 4).forEach((loc, idx) => {
+        doc.text(`- ${loc}`, 24, y + (idx * 7));
+      });
+    } else {
+      grayRow(`HOTEL: ${hotel.hotel_name || v.hotel_code || "-"}`, y);
+      y += 10;
+
+      grayRow(`REASON: ${v.reason || "-"}`, y);
+      y += 10;
+
+      grayRow("ROOM: 1", y);
+      y += 12;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const address = hotel.address || "Address not configured";
+      const phone = hotel.phone || "-";
+      const shuttle = hotel.shuttle_info || "-";
+      doc.text(`- Address: ${address}`, 24, y);
+      doc.text(`- Phone: ${phone}`, 24, y + 7);
+      doc.text(`- Shuttle: ${shuttle}`, 24, y + 14);
     }
 
-    if (v.voucher_type === "HOTEL") {
-      const hotel = state.hotels.find((x) => x.hotel_code === v.hotel_code) || {};
-      write("Flight", v.flight || "-");
-      write("Hotel", hotel.hotel_name || v.hotel_code);
-      write("Address", hotel.address || "-");
-      write("Phone", hotel.phone || "-");
-      write("Shuttle", hotel.shuttle_info || "-");
-      write("Room", "1");
-      write("Reason", v.reason || "-");
-    }
+    // Validation block
+    doc.setDrawColor(150, 150, 150);
+    doc.line(20, 212, 190, 212);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.text("Not valid without stamp/authorized signature of Qatar Airways Station Manager", 20, 220);
+    doc.text("Not valid after date of issuance", 20, 226);
 
-    write("Voucher ID", v.id);
-    write("Prepared by", v.staff_number);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("VALIDATION STAMP", 20, 234);
+
+    // QR block on the right
+    doc.setDrawColor(120, 120, 120);
+    doc.rect(145, 218, 45, 45);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.text("SCAN TO VALIDATE", 167.5, 223, { align: "center" });
 
     const qr = await qrDataUrl(v.id);
     if (qr) {
-      doc.addImage(qr, "PNG", 145, 45, 50, 50);
+      doc.addImage(qr, "PNG", 151, 226, 33, 33);
     } else {
-      doc.setFontSize(9);
-      doc.text("QR unavailable", 150, 70);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text("QR unavailable", 167.5, 246, { align: "center" });
     }
+
+    // Footer bars
+    doc.setFillColor(196, 196, 196);
+    doc.rect(20, 268, 170, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(20, 20, 20);
+    doc.text("ACCOUNT - CODE 495 / STATION GRU", 22, 272);
+
+    doc.setFillColor(160, 160, 160);
+    doc.rect(20, 276, 170, 6, "F");
+    doc.setFontSize(9);
+    doc.text("QATAR AIRWAYS", 22, 280.2);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Sao Paulo - GRU - Brazil", 22, 287);
   }
 
   const bytes = doc.output("arraybuffer");
@@ -357,7 +433,6 @@ async function buildVoucherPdf(vouchers, type, fileName) {
   state.lastPdfBase64 = b64FromUint8(uint8);
   state.lastPdfFileName = fileName;
 }
-
 el.issueMealButton.addEventListener("click", async () => {
   try {
     const mode = el.mealMode.value;
@@ -763,4 +838,8 @@ el.validateVoucherButton.addEventListener("click", async () => {
 switchTab("issue");
 mealModeUI();
 setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+
+
+
+
 
