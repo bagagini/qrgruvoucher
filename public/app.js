@@ -123,6 +123,37 @@ function b64FromUint8(uint8) {
   return btoa(binary);
 }
 
+let qatarLogoDataUrlPromise = null;
+
+async function loadQatarLogoDataUrl() {
+  if (qatarLogoDataUrlPromise) {
+    return qatarLogoDataUrlPromise;
+  }
+
+  qatarLogoDataUrlPromise = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve("");
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve("");
+      }
+    };
+    img.onerror = () => resolve("");
+    img.src = "/assets/qatar-airways-logo.png";
+  });
+
+  return qatarLogoDataUrlPromise;
+}
 function downloadBlob(name, blob) {
   const a = document.createElement("a");
   const url = URL.createObjectURL(blob);
@@ -282,6 +313,7 @@ function linesFromLocations(text) {
 async function buildVoucherPdf(vouchers, type, fileName) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const logoDataUrl = await loadQatarLogoDataUrl();
 
   const formatDate = (iso) => {
     const d = new Date(iso);
@@ -315,7 +347,6 @@ async function buildVoucherPdf(vouchers, type, fileName) {
     const vendor = state.vendors.find((x) => x.vendor_code === v.vendor_code) || {};
     const hotel = state.hotels.find((x) => x.hotel_code === v.hotel_code) || {};
 
-    // Header band
     doc.setFillColor(22, 22, 22);
     doc.rect(20, 20, 170, 26, "F");
 
@@ -328,12 +359,16 @@ async function buildVoucherPdf(vouchers, type, fileName) {
     doc.setFontSize(10);
     doc.text(`Voucher ${v.id}`, 24, 38);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.text("QATAR", 167, 31, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("AIRWAYS", 167, 36, { align: "right" });
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", 145, 24, 38, 16);
+    } else {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.text("QATAR", 167, 31, { align: "right" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text("AIRWAYS", 167, 36, { align: "right" });
+    }
 
     doc.setTextColor(35, 35, 35);
     doc.setFont("helvetica", "normal");
@@ -346,8 +381,14 @@ async function buildVoucherPdf(vouchers, type, fileName) {
       grayRow(`VENDOR: ${vendor.vendor_name || v.vendor_code || "-"}`, y);
       y += 10;
 
-      grayRow(`MEAL TYPE: ${mealTypeLine(isInad ? v.subtype : "")}`, y);
-      y += 10;
+      if (isInad) {
+        grayRow(`MEAL TYPE: ${mealTypeLine(v.subtype || "")}`, y);
+        y += 10;
+      } else {
+        const authorizedValue = v.authorized_value == null ? "-" : `R$ ${Number(v.authorized_value).toFixed(2)}`;
+        grayRow(`AUTHORIZED VALUE: ${authorizedValue}`, y);
+        y += 10;
+      }
 
       grayRow("TOTAL MEALS: 1", y);
       y += 12;
@@ -379,35 +420,29 @@ async function buildVoucherPdf(vouchers, type, fileName) {
       doc.text(`- Shuttle: ${shuttle}`, 24, y + 14);
     }
 
-    // Validation block
     doc.setDrawColor(150, 150, 150);
     doc.line(20, 212, 190, 212);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.text("Not valid without stamp/authorized signature of Qatar Airways Station Manager", 20, 220);
-    doc.text("Not valid after date of issuance", 20, 226);
+    doc.text("Not valid after issuance date", 20, 220);
+    doc.text("Valid only for Qatar Airways Passangers", 20, 226);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.text("VALIDATION STAMP", 20, 234);
 
-    // QR block on the right
     doc.setDrawColor(120, 120, 120);
     doc.rect(145, 218, 45, 45);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8.5);
-    doc.text("SCAN TO VALIDATE", 167.5, 223, { align: "center" });
 
     const qr = await qrDataUrl(v.id);
     if (qr) {
-      doc.addImage(qr, "PNG", 151, 226, 33, 33);
+      doc.addImage(qr, "PNG", 151, 224, 33, 33);
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       doc.text("QR unavailable", 167.5, 246, { align: "center" });
     }
 
-    // Footer bars
     doc.setFillColor(196, 196, 196);
     doc.rect(20, 268, 170, 6, "F");
     doc.setFont("helvetica", "bold");
@@ -838,6 +873,7 @@ el.validateVoucherButton.addEventListener("click", async () => {
 switchTab("issue");
 mealModeUI();
 setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+
 
 
 
