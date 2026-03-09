@@ -8,7 +8,8 @@ const state = {
   hotels: [],
   lastPdfBase64: "",
   lastPdfFileName: "",
-  lastReport: null
+  lastReport: null,
+  adminTables: []
 };
 
 const el = {
@@ -78,6 +79,19 @@ const el = {
   cfgHotelPin: document.getElementById("cfgHotelPin"),
   saveHotelButton: document.getElementById("saveHotelButton"),
   configStatus: document.getElementById("configStatus"),
+
+  adminCard: document.getElementById("adminCard"),
+  adminTable: document.getElementById("adminTable"),
+  adminLimit: document.getElementById("adminLimit"),
+  adminRefreshTablesButton: document.getElementById("adminRefreshTablesButton"),
+  adminLoadRowsButton: document.getElementById("adminLoadRowsButton"),
+  adminWhere: document.getElementById("adminWhere"),
+  adminRowJson: document.getElementById("adminRowJson"),
+  adminUpsertButton: document.getElementById("adminUpsertButton"),
+  adminDeleteButton: document.getElementById("adminDeleteButton"),
+  adminStatus: document.getElementById("adminStatus"),
+  adminColumns: document.getElementById("adminColumns"),
+  adminRows: document.getElementById("adminRows"),
 
   validationMode: document.getElementById("validationMode"),
   validationCode: document.getElementById("validationCode"),
@@ -211,10 +225,45 @@ el.staffLoginButton.addEventListener("click", async () => {
 
 async function qrDataUrl(voucherId) {
   const qrLib = window.QRCode;
-  if (!qrLib || typeof qrLib.toDataURL !== "function") {
+  if (!qrLib) {
     return null;
   }
-  return await qrLib.toDataURL(voucherId, { width: 200, margin: 1, errorCorrectionLevel: "M" });
+
+  if (typeof qrLib.toDataURL === "function") {
+    return await qrLib.toDataURL(voucherId, { width: 200, margin: 1, errorCorrectionLevel: "M" });
+  }
+
+  // Fallback for qrcodejs-style constructor API.
+  const holder = document.createElement("div");
+  holder.style.position = "fixed";
+  holder.style.left = "-9999px";
+  holder.style.top = "-9999px";
+  document.body.appendChild(holder);
+
+  try {
+    new qrLib(holder, {
+      text: String(voucherId || ""),
+      width: 200,
+      height: 200,
+      correctLevel: qrLib.CorrectLevel ? qrLib.CorrectLevel.M : undefined
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const canvas = holder.querySelector("canvas");
+    if (canvas && typeof canvas.toDataURL === "function") {
+      return canvas.toDataURL("image/png");
+    }
+
+    const img = holder.querySelector("img");
+    if (img && img.src) {
+      return img.src;
+    }
+
+    return null;
+  } finally {
+    holder.remove();
+  }
 }
 
 function valueText(voucher, vendor) {
@@ -426,7 +475,10 @@ el.supervisorLoginButton.addEventListener("click", async () => {
     state.supervisorToken = res.token;
     el.reportsCard.classList.remove("hidden");
     el.configCard.classList.remove("hidden");
+    el.adminCard.classList.remove("hidden");
     setStatus(el.supervisorStatus, "Supervisor authenticated", true);
+    await loadAdminTables();
+    await loadAdminRows();
   } catch (error) {
     setStatus(el.supervisorStatus, error.message, false);
   }
@@ -540,6 +592,114 @@ el.saveHotelButton.addEventListener("click", async () => {
   }
 });
 
+function parseJsonObject(input, label) {
+  const raw = String(input || "").trim();
+  if (!raw) {
+    return {};
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${label} must be valid JSON`);
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label} must be a JSON object`);
+  }
+  return parsed;
+}
+
+async function loadAdminTables() {
+  const res = await api("/api/admin-db?action=tables", {}, state.supervisorToken);
+  state.adminTables = res.tables || [];
+  el.adminTable.innerHTML = state.adminTables.map((t) => `<option value="${t}">${t}</option>`).join("");
+}
+
+async function loadAdminRows() {
+  const table = el.adminTable.value;
+  if (!table) {
+    setStatus(el.adminStatus, "Select a table", false);
+    return;
+  }
+
+  const limit = Math.min(Math.max(Number(el.adminLimit.value || 120), 1), 500);
+  const res = await api(`/api/admin-db?table=${encodeURIComponent(table)}&limit=${limit}`, {}, state.supervisorToken);
+  el.adminColumns.textContent = JSON.stringify(res.columns || [], null, 2);
+  el.adminRows.textContent = JSON.stringify(res.rows || [], null, 2);
+  setStatus(el.adminStatus, `Loaded ${(res.rows || []).length} rows from ${table}`, true);
+}
+
+el.adminRefreshTablesButton.addEventListener("click", async () => {
+  try {
+    await loadAdminTables();
+    setStatus(el.adminStatus, "Tables refreshed", true);
+  } catch (error) {
+    setStatus(el.adminStatus, error.message, false);
+  }
+});
+
+el.adminLoadRowsButton.addEventListener("click", async () => {
+  try {
+    await loadAdminRows();
+  } catch (error) {
+    setStatus(el.adminStatus, error.message, false);
+  }
+});
+
+el.adminUpsertButton.addEventListener("click", async () => {
+  try {
+    const table = el.adminTable.value;
+    if (!table) {
+      setStatus(el.adminStatus, "Select a table", false);
+      return;
+    }
+
+    const row = parseJsonObject(el.adminRowJson.value, "ROW JSON");
+    const where = parseJsonObject(el.adminWhere.value, "WHERE JSON");
+    if (!Object.keys(row).length) {
+      setStatus(el.adminStatus, "ROW JSON cannot be empty", false);
+      return;
+    }
+
+    const res = await api("/api/admin-db", {
+      method: "POST",
+      body: JSON.stringify({ action: "upsert", table, row, where })
+    }, state.supervisorToken);
+
+    setStatus(el.adminStatus, `Saved. Changes: ${res.changes || 0}`, true);
+    await loadAdminRows();
+  } catch (error) {
+    setStatus(el.adminStatus, error.message, false);
+  }
+});
+
+el.adminDeleteButton.addEventListener("click", async () => {
+  try {
+    const table = el.adminTable.value;
+    if (!table) {
+      setStatus(el.adminStatus, "Select a table", false);
+      return;
+    }
+
+    const where = parseJsonObject(el.adminWhere.value, "WHERE JSON");
+    if (!Object.keys(where).length) {
+      setStatus(el.adminStatus, "WHERE JSON is required for delete", false);
+      return;
+    }
+
+    const res = await api("/api/admin-db", {
+      method: "POST",
+      body: JSON.stringify({ action: "delete", table, where })
+    }, state.supervisorToken);
+
+    setStatus(el.adminStatus, `Deleted. Changes: ${res.changes || 0}`, true);
+    await loadAdminRows();
+  } catch (error) {
+    setStatus(el.adminStatus, error.message, false);
+  }
+});
 el.validationLoginButton.addEventListener("click", async () => {
   try {
     const mode = el.validationMode.value;
@@ -582,5 +742,4 @@ el.validateVoucherButton.addEventListener("click", async () => {
 
 switchTab("issue");
 mealModeUI();
-
 

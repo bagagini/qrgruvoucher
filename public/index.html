@@ -6,7 +6,7 @@
   <title>GRU Disruption Voucher System</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js" defer></script>
+  <script src="/vendor/qrcode.min.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -31,6 +31,7 @@
         <button class="tab active" data-tab="issue">Voucher Generation</button>
         <button class="tab" data-tab="latest">Latest Issued</button>
         <button class="tab" data-tab="supervisor">Supervisor Reports</button>
+        <button class="tab" data-tab="admin">Admin DB</button>
         <button class="tab" data-tab="validation">Vendor Validation</button>
       </div>
 
@@ -186,6 +187,44 @@
         </div>
       </div>
 
+      <div class="tab-content hidden" id="tab-admin">
+        <div class="card hidden" id="adminCard">
+          <h3>Admin Database (Supervisor)</h3>
+          <div class="grid-2">
+            <div>
+              <label for="adminTable">Table</label>
+              <select id="adminTable"></select>
+            </div>
+            <div>
+              <label for="adminLimit">Rows limit</label>
+              <input id="adminLimit" type="number" min="1" max="500" value="120">
+            </div>
+          </div>
+          <div class="actions">
+            <button id="adminRefreshTablesButton">Refresh tables</button>
+            <button id="adminLoadRowsButton">Load rows</button>
+          </div>
+          <div class="grid-2">
+            <div>
+              <label for="adminWhere">WHERE JSON (for update/delete)</label>
+              <textarea id="adminWhere" placeholder='{"id":"ALI-20260306-00001"}'></textarea>
+            </div>
+            <div>
+              <label for="adminRowJson">ROW JSON (for insert/update)</label>
+              <textarea id="adminRowJson" placeholder='{"status":"USED"}'></textarea>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="adminUpsertButton">Insert / Update</button>
+            <button id="adminDeleteButton">Delete</button>
+          </div>
+          <p id="adminStatus" class="status"></p>
+          <h4>Columns</h4>
+          <pre id="adminColumns" class="summary"></pre>
+          <h4>Rows</h4>
+          <pre id="adminRows" class="summary"></pre>
+        </div>
+      </div>
       <div class="tab-content hidden" id="tab-validation">
         <div class="card" id="validationLoginCard">
           <h3>Vendor / Hotel Validation Login</h3>
