@@ -9,7 +9,8 @@ const state = {
   lastPdfBase64: "",
   lastPdfFileName: "",
   lastReport: null,
-  adminTables: []
+  adminTables: [],
+  printProfile: "A4_SAFE"
 };
 
 const el = {
@@ -25,6 +26,7 @@ const el = {
   mealFlight: document.getElementById("mealFlight"),
   mealReason: document.getElementById("mealReason"),
   mealQuantity: document.getElementById("mealQuantity"),
+  printProfile: document.getElementById("printProfile"),
   mealFlightWrap: document.getElementById("mealFlightWrap"),
   mealReasonWrap: document.getElementById("mealReasonWrap"),
   mealQtyWrap: document.getElementById("mealQtyWrap"),
@@ -142,14 +144,38 @@ async function loadQatarLogoDataUrl() {
           resolve("");
           return;
         }
+
         ctx.drawImage(img, 0, 0);
+
+        // Force logo to white while keeping alpha/transparency.
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const alpha = data[i + 3];
+          if (alpha > 10) {
+            data[i] = 255;
+            data[i + 1] = 255;
+            data[i + 2] = 255;
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+
         resolve(canvas.toDataURL("image/png"));
       } catch {
         resolve("");
       }
     };
-    img.onerror = () => resolve("");
-    img.src = "/assets/qatar-airways-logo.png";
+
+    img.onerror = () => {
+      if (!img.dataset.fallback) {
+        img.dataset.fallback = "1";
+        img.src = "/assets/qatar-airways-logo.png";
+        return;
+      }
+      resolve("");
+    };
+
+    img.src = "/assets/qatar-airways-logo.svg";
   });
 
   return qatarLogoDataUrlPromise;
@@ -210,6 +236,11 @@ function mealModeUI() {
 }
 
 el.mealMode.addEventListener("change", mealModeUI);
+if (el.printProfile) {
+  el.printProfile.addEventListener("change", () => {
+    state.printProfile = el.printProfile.value || "A4_SAFE";
+  });
+}
 
 async function loadCatalogs() {
   const [vendorsRes, hotelsRes] = await Promise.all([
@@ -315,6 +346,53 @@ async function buildVoucherPdf(vouchers, type, fileName) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const logoDataUrl = await loadQatarLogoDataUrl();
 
+  const profiles = {
+    A4_SAFE: {
+      headerY: 24,
+      titleY: 34.5,
+      voucherY: 40.8,
+      badgeY: 42.2,
+      logoY: 28.8,
+      layoverY: 60,
+      bodyStartY: 66,
+      termsLineY: 216,
+      termsTextY1: 224,
+      termsTextY2: 230,
+      stampY: 238,
+      qrBoxY: 222,
+      qrImageY: 228,
+      footer1Y: 272,
+      footer1TextY: 276,
+      footer2Y: 280,
+      footer2TextY: 284.2,
+      cityY: 291,
+      techY: 294
+    },
+    A4_COMPACT: {
+      headerY: 20,
+      titleY: 30.5,
+      voucherY: 36.8,
+      badgeY: 38.2,
+      logoY: 24.8,
+      layoverY: 56,
+      bodyStartY: 62,
+      termsLineY: 212,
+      termsTextY1: 220,
+      termsTextY2: 226,
+      stampY: 234,
+      qrBoxY: 218,
+      qrImageY: 224,
+      footer1Y: 268,
+      footer1TextY: 272,
+      footer2Y: 276,
+      footer2TextY: 280.2,
+      cityY: 287,
+      techY: 290
+    }
+  };
+
+  const p = profiles[state.printProfile] || profiles.A4_SAFE;
+
   const formatDate = (iso) => {
     const d = new Date(iso);
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
@@ -348,34 +426,41 @@ async function buildVoucherPdf(vouchers, type, fileName) {
     const hotel = state.hotels.find((x) => x.hotel_code === v.hotel_code) || {};
 
     doc.setFillColor(22, 22, 22);
-    doc.rect(20, 20, 170, 26, "F");
+    doc.rect(20, p.headerY, 170, 26, "F");
 
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12.5);
-    doc.text(isHotel ? "Hotel Accommodation Transportation Order" : "Meal Accommodation Transportation Order", 24, 31);
+    doc.setFontSize(11.8);
+    doc.text(isHotel ? "Hotel Accommodation Transportation Order" : "Meal Accommodation Transportation Order", 24, p.titleY);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Voucher ${v.id}`, 24, 38);
+    doc.setFontSize(9.2);
+    doc.text(`Voucher ${v.id}`, 24, p.voucherY);
+
+    const categoryLabel = isHotel ? "CATEGORY: HOTEL" : isInad ? "CATEGORY: MEAL INAD" : "CATEGORY: MEAL NORMAL";
+    doc.setDrawColor(255, 255, 255);
+    doc.roundedRect(24, p.badgeY, 52, 6, 1.2, 1.2, "S");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.2);
+    doc.text(categoryLabel, 26, p.badgeY + 4);
 
     if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", 145, 24, 38, 16);
+      doc.addImage(logoDataUrl, "PNG", 152, p.logoY, 31, 12.6);
     } else {
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text("QATAR", 167, 31, { align: "right" });
+      doc.setFontSize(13);
+      doc.text("QATAR", 184, p.titleY, { align: "right" });
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.text("AIRWAYS", 167, 36, { align: "right" });
+      doc.setFontSize(7.6);
+      doc.text("AIRWAYS", 184, p.voucherY - 1.5, { align: "right" });
     }
 
     doc.setTextColor(35, 35, 35);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10.5);
-    doc.text(`LAYOVER POINT: GRU - ${v.flight || "-"} - DATE: ${formatDate(v.created_at)}`, 20, 56);
+    doc.text(`LAYOVER POINT: GRU - ${v.flight || "-"} - DATE: ${formatDate(v.created_at)}`, 20, p.layoverY);
 
-    let y = 62;
+    let y = p.bodyStartY;
 
     if (!isHotel) {
       grayRow(`VENDOR: ${vendor.vendor_name || v.vendor_code || "-"}`, y);
@@ -397,9 +482,13 @@ async function buildVoucherPdf(vouchers, type, fileName) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       const locList = locations.length ? locations : ["Partner location will validate this voucher."];
-      locList.slice(0, 4).forEach((loc, idx) => {
+      const capped = locList.slice(0, 2).map((loc) => (loc.length > 78 ? `${loc.slice(0, 75)}...` : loc));
+      capped.forEach((loc, idx) => {
         doc.text(`- ${loc}`, 24, y + (idx * 7));
       });
+      if (locList.length > 2) {
+        doc.text("- ...", 24, y + 14);
+      }
     } else {
       grayRow(`HOTEL: ${hotel.hotel_name || v.hotel_code || "-"}`, y);
       y += 10;
@@ -421,43 +510,46 @@ async function buildVoucherPdf(vouchers, type, fileName) {
     }
 
     doc.setDrawColor(150, 150, 150);
-    doc.line(20, 212, 190, 212);
+    doc.line(20, p.termsLineY, 190, p.termsLineY);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9.5);
-    doc.text("Not valid after issuance date", 20, 220);
-    doc.text("Valid only for Qatar Airways Passangers", 20, 226);
+    doc.text("Not valid after the issuance date.", 20, p.termsTextY1);
+    doc.text("Valid only for Qatar Airways passengers.", 20, p.termsTextY2);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
-    doc.text("VALIDATION STAMP", 20, 234);
+    doc.text("VALIDATION STAMP", 20, p.stampY);
 
     doc.setDrawColor(120, 120, 120);
-    doc.rect(145, 218, 45, 45);
+    doc.rect(145, p.qrBoxY, 45, 45);
 
     const qr = await qrDataUrl(v.id);
     if (qr) {
-      doc.addImage(qr, "PNG", 151, 224, 33, 33);
+      doc.addImage(qr, "PNG", 151, p.qrImageY, 33, 33);
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
-      doc.text("QR unavailable", 167.5, 246, { align: "center" });
+      doc.text("QR unavailable", 167.5, p.qrImageY + 22, { align: "center" });
     }
 
     doc.setFillColor(196, 196, 196);
-    doc.rect(20, 268, 170, 6, "F");
+    doc.rect(20, p.footer1Y, 170, 6, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(20, 20, 20);
-    doc.text("ACCOUNT - CODE 495 / STATION GRU", 22, 272);
+    doc.text("ACCOUNT - CODE 495 / STATION GRU", 22, p.footer1TextY);
 
     doc.setFillColor(160, 160, 160);
-    doc.rect(20, 276, 170, 6, "F");
+    doc.rect(20, p.footer2Y, 170, 6, "F");
     doc.setFontSize(9);
-    doc.text("QATAR AIRWAYS", 22, 280.2);
+    doc.text("QATAR AIRWAYS", 22, p.footer2TextY);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.text("Sao Paulo - GRU - Brazil", 22, 287);
+    doc.text("Sao Paulo - GRU - Brazil", 22, p.cityY);
+
+    doc.setFontSize(7.6);
+    doc.text(`Version: v2.1 | Generated UTC: ${new Date(v.created_at).toISOString()}`, 22, p.techY);
   }
 
   const bytes = doc.output("arraybuffer");
@@ -723,7 +815,7 @@ function parseJsonObject(input, label) {
 
 async function loadAdminTables() {
   if (!state.supervisorToken) {
-    setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+    setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
     return;
   }
 
@@ -734,7 +826,7 @@ async function loadAdminTables() {
 
 async function loadAdminRows() {
   if (!state.supervisorToken) {
-    setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+    setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
     return;
   }
 
@@ -771,7 +863,7 @@ el.adminLoadRowsButton.addEventListener("click", async () => {
 el.adminUpsertButton.addEventListener("click", async () => {
   try {
     if (!state.supervisorToken) {
-      setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+      setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
       return;
     }
 
@@ -803,7 +895,7 @@ el.adminUpsertButton.addEventListener("click", async () => {
 el.adminDeleteButton.addEventListener("click", async () => {
   try {
     if (!state.supervisorToken) {
-      setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+      setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
       return;
     }
 
@@ -872,7 +964,17 @@ el.validateVoucherButton.addEventListener("click", async () => {
 
 switchTab("issue");
 mealModeUI();
-setStatus(el.adminStatus, "Faca login como supervisor na aba Supervisor Reports", false);
+setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
+
+
+
+
+
+
+
+
+
+
 
 
 
