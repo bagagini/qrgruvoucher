@@ -63,6 +63,9 @@ const el = {
   exportPdfSummaryButton: document.getElementById("exportPdfSummaryButton"),
   reportSummary: document.getElementById("reportSummary"),
   reportRows: document.getElementById("reportRows"),
+  runFinanceDashboardButton: document.getElementById("runFinanceDashboardButton"),
+  financeSummary: document.getElementById("financeSummary"),
+  financeRows: document.getElementById("financeRows"),
 
   cfgVendorCode: document.getElementById("cfgVendorCode"),
   cfgVendorName: document.getElementById("cfgVendorName"),
@@ -702,6 +705,37 @@ async function runReport(format = "json") {
   }, state.supervisorToken);
 }
 
+async function runFinanceDashboard() {
+  const payload = {
+    dateFrom: el.dateFrom.value.trim(),
+    dateTo: el.dateTo.value.trim(),
+    vendor: el.reportVendor.value.trim(),
+    hotel: el.reportHotel.value.trim(),
+    staff: el.reportStaff.value.trim(),
+    flight: el.reportFlight.value.trim()
+  };
+
+  return await api("/api/finance-dashboard", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  }, state.supervisorToken);
+}
+
+el.runFinanceDashboardButton.addEventListener("click", async () => {
+  try {
+    const res = await runFinanceDashboard();
+    const d = res.dashboard || {};
+    el.financeSummary.textContent = JSON.stringify(d.kpis || {}, null, 2);
+    el.financeRows.innerHTML = "";
+    for (const row of (d.by_partner || []).slice(0, 200)) {
+      const li = document.createElement("li");
+      li.textContent = `${row.partner_type} ${row.partner_code} | vouchers ${row.vouchers} | estimated R$ ${Number(row.estimated_value || 0).toFixed(2)}`;
+      el.financeRows.appendChild(li);
+    }
+  } catch (error) {
+    el.financeSummary.textContent = error.message;
+  }
+});
 el.runReportButton.addEventListener("click", async () => {
   try {
     const res = await runReport("json");
@@ -965,6 +999,11 @@ el.validateVoucherButton.addEventListener("click", async () => {
 switchTab("issue");
 mealModeUI();
 setStatus(el.adminStatus, "Login as supervisor in the Supervisor Reports tab", false);
+
+
+
+
+
 
 
 

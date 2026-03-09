@@ -1,5 +1,5 @@
 import { requireSession } from "./_auth.js";
-import { badRequest, dbSetupErrorResponse, json, methodNotAllowed, readJson } from "./_utils.js";
+import { badRequest, dbSetupErrorResponse, isoNow, json, methodNotAllowed, readJson } from "./_utils.js";
 import { dbSetupIssue } from "./_db.js";
 
 function validIdentifier(name) {
@@ -53,9 +53,29 @@ function filterDataByColumns(data, columns) {
   }, {});
 }
 
+function whereClause(where) {
+  const keys = Object.keys(where || {});
+  if (!keys.length) {
+    return { sql: "", values: [] };
+  }
+
+  const sql = keys.map((k) => `${quoteIdentifier(k)} = ?`).join(" AND ");
+  const values = keys.map((k) => where[k]);
+  return { sql, values };
+}
+
 async function loadRows(db, table, limit) {
   const sql = `SELECT * FROM ${quoteIdentifier(table)} ORDER BY rowid DESC LIMIT ?`;
   const rows = await db.prepare(sql).bind(limit).all();
+  return rows.results || [];
+}
+
+async function loadRowsByWhere(db, table, where, limit = 200) {
+  const { sql, values } = whereClause(where);
+  const fullSql = sql
+    ? `SELECT * FROM ${quoteIdentifier(table)} WHERE ${sql} ORDER BY rowid DESC LIMIT ?`
+    : `SELECT * FROM ${quoteIdentifier(table)} ORDER BY rowid DESC LIMIT ?`;
+  const rows = await db.prepare(fullSql).bind(...values, limit).all();
   return rows.results || [];
 }
 
@@ -108,6 +128,36 @@ async function deleteRows(db, table, where) {
   return Number(result?.meta?.changes || 0);
 }
 
+async function writeAudit(db, session, payload) {
+  const details = {
+    table: payload.table,
+    action: payload.action,
+    where: payload.where || {},
+    row: payload.row || {},
+    changes: payload.changes || 0,
+    before_rows: (payload.beforeRows || []).slice(0, 50),
+    after_rows: (payload.afterRows || []).slice(0, 50)
+  };
+
+  const voucherId = payload.table === "vouchers"
+    ? String((payload.row && payload.row.id) || (payload.where && payload.where.id) || "")
+    : null;
+
+  await db.prepare(`
+    INSERT INTO audit_logs (action_type, actor_type, actor_id, voucher_id, details_json, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `)
+    .bind(
+      payload.action,
+      String(session.role || "SUPERVISOR"),
+      String(session.actor_id || ""),
+      voucherId,
+      JSON.stringify(details),
+      isoNow()
+    )
+    .run();
+}
+
 export async function onRequest(context) {
   const auth = await requireSession(context, ["SUPERVISOR"]);
   if (!auth.ok) return auth.response;
@@ -150,6 +200,9 @@ export async function onRequest(context) {
 
     const tables = await listTables(db);
     if (!tables.includes(table)) return badRequest("Unknown table");
+    if (!tables.includes("audit_logs")) {
+      return badRequest("audit_logs table is required for Admin DB mutations");
+    }
 
     const columns = await tableColumns(db, table);
     const row = filterDataByColumns(body.row, columns);
@@ -157,14 +210,47 @@ export async function onRequest(context) {
 
     try {
       if (action === "delete") {
+        const beforeRows = await loadRowsByWhere(db, table, where, 200);
         const changes = await deleteRows(db, table, where);
+        await writeAudit(db, auth.session, {
+          action: "ADMIN_DB_DELETE",
+          table,
+          where,
+          row,
+          changes,
+          beforeRows,
+          afterRows: []
+        });
         return json({ ok: true, action, table, changes });
       }
 
       if (action === "upsert") {
-        const changes = Object.keys(where).length
-          ? await updateRows(db, table, row, where)
-          : await insertRow(db, table, row);
+        if (Object.keys(where).length) {
+          const beforeRows = await loadRowsByWhere(db, table, where, 200);
+          const changes = await updateRows(db, table, row, where);
+          const afterRows = await loadRowsByWhere(db, table, where, 200);
+          await writeAudit(db, auth.session, {
+            action: "ADMIN_DB_UPDATE",
+            table,
+            where,
+            row,
+            changes,
+            beforeRows,
+            afterRows
+          });
+          return json({ ok: true, action, table, changes });
+        }
+
+        const changes = await insertRow(db, table, row);
+        await writeAudit(db, auth.session, {
+          action: "ADMIN_DB_INSERT",
+          table,
+          where,
+          row,
+          changes,
+          beforeRows: [],
+          afterRows: [row]
+        });
 
         return json({ ok: true, action, table, changes });
       }

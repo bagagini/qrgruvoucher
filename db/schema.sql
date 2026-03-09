@@ -63,3 +63,15 @@ CREATE TABLE IF NOT EXISTS batches (
   created_at TEXT NOT NULL,
   pdf_key TEXT
 );
+
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  action_type TEXT NOT NULL,
+  actor_type TEXT NOT NULL,
+  actor_id TEXT,
+  voucher_id TEXT,
+  details_json TEXT,
+  created_at TEXT NOT NULL
+);
+
