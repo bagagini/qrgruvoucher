@@ -53,7 +53,7 @@ const seedVendors = [
 ];
 
 const seedHotels = [
-  { hotel_code: "PULLMAN_GRU", hotel_name: "Pullman GRU", address: "Rod. Hélio Smidt, GRU", phone: "+55 11 5508-5508", shuttle_info: "Every 30 min from T3", pin: "9001", status: "ACTIVE" },
+  { hotel_code: "PULLMAN_GRU", hotel_name: "Pullman GRU", address: "Rod. Helio Smidt, GRU", phone: "+55 11 5508-5508", shuttle_info: "Every 30 min from T3", pin: "9001", status: "ACTIVE" },
   { hotel_code: "PANAMBY_GRU", hotel_name: "Panamby GRU", address: "Avenida Guinle, Guarulhos", phone: "+55 11 2645-5000", shuttle_info: "On demand", pin: "9002", status: "ACTIVE" },
   { hotel_code: "MARRIOTT_GRU", hotel_name: "Marriott GRU", address: "Airport perimeter road", phone: "+55 11 2468-6999", shuttle_info: "Every hour", pin: "9003", status: "ACTIVE" },
   { hotel_code: "PANAMBY_BARRA", hotel_name: "Panamby Barra", address: "Barra Funda, Sao Paulo", phone: "+55 11 3322-4455", shuttle_info: "No shuttle", pin: "9004", status: "ACTIVE" },
@@ -86,91 +86,10 @@ async function ensureD1(env) {
   }
 
   try {
-    await env.DB.exec(`
-      CREATE TABLE IF NOT EXISTS staff (
-        staff_number TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        status TEXT NOT NULL,
-        role TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS vendors (
-        vendor_code TEXT PRIMARY KEY,
-        vendor_name TEXT NOT NULL,
-        billing_type TEXT NOT NULL,
-        value_amount REAL,
-        combo_text TEXT,
-        locations_text TEXT,
-        pin TEXT NOT NULL,
-        status TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS hotels (
-        hotel_code TEXT PRIMARY KEY,
-        hotel_name TEXT NOT NULL,
-        address TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        shuttle_info TEXT NOT NULL,
-        pin TEXT NOT NULL,
-        status TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        actor_type TEXT NOT NULL,
-        actor_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS vouchers (
-        id TEXT PRIMARY KEY,
-        voucher_type TEXT NOT NULL,
-        subtype TEXT,
-        status TEXT NOT NULL,
-        vendor_code TEXT,
-        hotel_code TEXT,
-        flight TEXT,
-        reason TEXT,
-        staff_number TEXT NOT NULL,
-        service_text TEXT,
-        authorized_value REAL,
-        created_at TEXT NOT NULL,
-        used_at TEXT,
-        used_by TEXT,
-        meta_json TEXT,
-        batch_id TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS batches (
-        batch_id TEXT PRIMARY KEY,
-        voucher_type TEXT NOT NULL,
-        file_name TEXT NOT NULL,
-        count INTEGER NOT NULL,
-        staff_number TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        pdf_key TEXT
-      );
-    `);
-
-    for (const row of seedStaff) {
-      await env.DB.prepare("INSERT OR IGNORE INTO staff (staff_number, name, status, role) VALUES (?, ?, ?, ?)")
-        .bind(row.staff_number, row.name, row.status, row.role)
-        .run();
-    }
-
-    for (const row of seedVendors) {
-      await env.DB.prepare("INSERT OR IGNORE INTO vendors (vendor_code, vendor_name, billing_type, value_amount, combo_text, locations_text, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(row.vendor_code, row.vendor_name, row.billing_type, row.value_amount, row.combo_text, row.locations_text, row.pin, row.status)
-        .run();
-    }
-
-    for (const row of seedHotels) {
-      await env.DB.prepare("INSERT OR IGNORE INTO hotels (hotel_code, hotel_name, address, phone, shuttle_info, pin, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(row.hotel_code, row.hotel_name, row.address, row.phone, row.shuttle_info, row.pin, row.status)
-        .run();
-    }
+    // Runtime check only: schema/seed must be applied via Wrangler commands.
+    await env.DB.prepare("SELECT staff_number FROM staff LIMIT 1").first();
+    await env.DB.prepare("SELECT vendor_code FROM vendors LIMIT 1").first();
+    await env.DB.prepare("SELECT hotel_code FROM hotels LIMIT 1").first();
 
     globalState.db_setup_issue = "";
     d1Ready = true;
@@ -181,7 +100,6 @@ async function ensureD1(env) {
     return false;
   }
 }
-
 export function dbSetupIssue(env) {
   if (env && env.DB && globalState.db_setup_issue) {
     return globalState.db_setup_issue;
@@ -672,4 +590,6 @@ export function reportToCsv(report) {
   }
   return lines.join("\n");
 }
+
+
 

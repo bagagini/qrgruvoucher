@@ -55,7 +55,13 @@
             </div>
             <div id="mealReasonWrap">
               <label for="mealReason">Reason</label>
-              <input id="mealReason" placeholder="Delay / Cancellation / Misconnection">
+              <select id="mealReason">
+                <option value="">Select a reason</option>
+                <option value="Delay">Delay</option>
+                <option value="Cancellation">Cancellation</option>
+                <option value="Misconnection">Misconnection</option>
+                <option value="Diversion">Diversion</option>
+              </select>
             </div>
             <div id="mealQtyWrap">
               <label for="mealQuantity">Quantity</label>
@@ -87,7 +93,13 @@
             </div>
             <div>
               <label for="hotelReason">Reason</label>
-              <input id="hotelReason" placeholder="Cancellation / Misconnection">
+              <select id="hotelReason">
+                <option value="">Select a reason</option>
+                <option value="Delay">Delay</option>
+                <option value="Cancellation">Cancellation</option>
+                <option value="Misconnection">Misconnection</option>
+                <option value="Diversion">Diversion</option>
+              </select>
             </div>
             <div>
               <label for="hotelQuantity">Quantity of rooms</label>
@@ -213,3 +225,4 @@
   </main>
 </body>
 </html>
+

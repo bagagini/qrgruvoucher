@@ -210,7 +210,11 @@ el.staffLoginButton.addEventListener("click", async () => {
 });
 
 async function qrDataUrl(voucherId) {
-  return await QRCode.toDataURL(voucherId, { width: 200, margin: 1, errorCorrectionLevel: "M" });
+  const qrLib = window.QRCode;
+  if (!qrLib || typeof qrLib.toDataURL !== "function") {
+    return null;
+  }
+  return await qrLib.toDataURL(voucherId, { width: 200, margin: 1, errorCorrectionLevel: "M" });
 }
 
 function valueText(voucher, vendor) {
@@ -288,7 +292,12 @@ async function buildVoucherPdf(vouchers, type, fileName) {
     write("Prepared by", v.staff_number);
 
     const qr = await qrDataUrl(v.id);
-    doc.addImage(qr, "PNG", 145, 45, 50, 50);
+    if (qr) {
+      doc.addImage(qr, "PNG", 145, 45, 50, 50);
+    } else {
+      doc.setFontSize(9);
+      doc.text("QR unavailable", 150, 70);
+    }
   }
 
   const bytes = doc.output("arraybuffer");
@@ -313,6 +322,10 @@ el.issueMealButton.addEventListener("click", async () => {
         reason: el.mealReason.value.trim(),
         quantity: Number(el.mealQuantity.value || 0)
       };
+      if (!payload.reason) {
+        setStatus(el.mealStatus, "Select a reason", false);
+        return;
+      }
 
       const res = await api("/api/issue-meal", { method: "POST", body: JSON.stringify(payload) });
       await buildVoucherPdf(res.vouchers, "MEAL", res.fileName);
@@ -343,6 +356,10 @@ el.issueHotelButton.addEventListener("click", async () => {
       reason: el.hotelReason.value.trim(),
       quantity: Number(el.hotelQuantity.value || 0)
     };
+    if (!payload.reason) {
+      setStatus(el.hotelStatus, "Select a reason", false);
+      return;
+    }
 
     const res = await api("/api/issue-hotel", { method: "POST", body: JSON.stringify(payload) });
     await buildVoucherPdf(res.vouchers, "HOTEL", res.fileName);
@@ -565,3 +582,5 @@ el.validateVoucherButton.addEventListener("click", async () => {
 
 switchTab("issue");
 mealModeUI();
+
+
